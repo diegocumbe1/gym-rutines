@@ -10,6 +10,7 @@
  * Uso:
  *   pnpm import:free-exercises
  *   DRY_RUN=1 pnpm import:free-exercises
+ *   PRUNE_DUPLICATES=1 pnpm import:free-exercises
  *   LIMIT=50 pnpm import:free-exercises
  */
 import { createClient } from '@supabase/supabase-js'
@@ -22,6 +23,7 @@ const IMAGE_BASE_URL =
   'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/'
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : undefined
 const DRY_RUN = process.env.DRY_RUN === '1'
+const PRUNE_DUPLICATES = process.env.PRUNE_DUPLICATES === '1'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -45,6 +47,13 @@ type FreeExercise = {
   secondaryMuscles: string[]
   instructions: string[]
   images: string[]
+}
+
+type ExistingExercise = {
+  id: string
+  name: string | null
+  source: string | null
+  external_id: string | null
 }
 
 function normalize(value: string) {
@@ -93,6 +102,63 @@ function imageUrl(images: string[]) {
   return first ? `${IMAGE_BASE_URL}${first}` : null
 }
 
+async function fetchAllExercises() {
+  const pageSize = 1000
+  const rows: ExistingExercise[] = []
+
+  for (let from = 0; ; from += pageSize) {
+    const to = from + pageSize - 1
+    const { data, error } = await supabase
+      .from('exercises')
+      .select('id,name,source,external_id')
+      .range(from, to)
+
+    if (error) throw new Error(error.message)
+
+    rows.push(...((data ?? []) as ExistingExercise[]))
+    if (!data || data.length < pageSize) break
+  }
+
+  return rows
+}
+
+async function pruneDuplicateSourceRows(existing: ExistingExercise[]) {
+  const baseNames = new Set(
+    existing
+      .filter((item) => item.source !== SOURCE)
+      .map((item) => normalize(String(item.name ?? '')))
+      .filter(Boolean)
+  )
+  const duplicateRows = existing.filter(
+    (item) =>
+      item.source === SOURCE && baseNames.has(normalize(String(item.name ?? '')))
+  )
+
+  console.log(`Duplicados de ${SOURCE} contra fuentes base: ${duplicateRows.length}`)
+
+  if (!PRUNE_DUPLICATES || duplicateRows.length === 0) return existing
+
+  const chunkSize = 200
+  let deleted = 0
+  for (let i = 0; i < duplicateRows.length; i += chunkSize) {
+    const chunk = duplicateRows.slice(i, i + chunkSize)
+    const { error } = await supabase
+      .from('exercises')
+      .delete()
+      .in(
+        'id',
+        chunk.map((item) => item.id)
+      )
+
+    if (error) throw new Error(`No se pudieron eliminar duplicados: ${error.message}`)
+    deleted += chunk.length
+    console.log(`  duplicados eliminados ${deleted}/${duplicateRows.length}`)
+  }
+
+  const duplicateIds = new Set(duplicateRows.map((item) => item.id))
+  return existing.filter((item) => !duplicateIds.has(item.id))
+}
+
 async function main() {
   console.log(`Leyendo ${DATA_URL}...`)
   const res = await fetch(DATA_URL)
@@ -101,17 +167,13 @@ async function main() {
   const raw = (await res.json()) as FreeExercise[]
   const items = LIMIT ? raw.slice(0, LIMIT) : raw
 
-  const { data: existing, error } = await supabase
-    .from('exercises')
-    .select('name,source,external_id')
-
-  if (error) throw new Error(error.message)
+  const existing = await pruneDuplicateSourceRows(await fetchAllExercises())
 
   const existingNames = new Set(
-    (existing ?? []).map((item) => normalize(String(item.name ?? '')))
+    existing.map((item) => normalize(String(item.name ?? ''))).filter(Boolean)
   )
   const existingExternalIds = new Set(
-    (existing ?? [])
+    existing
       .filter((item) => item.source === SOURCE && item.external_id)
       .map((item) => String(item.external_id))
   )

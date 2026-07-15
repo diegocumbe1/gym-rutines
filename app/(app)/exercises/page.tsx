@@ -1,13 +1,17 @@
 import Link from 'next/link'
-import { Dumbbell, Search } from 'lucide-react'
-import { listExercises } from '@/lib/data/exercises'
+import { redirect } from 'next/navigation'
+import { ChevronLeft, ChevronRight, Dumbbell, Search } from 'lucide-react'
+import { listExercisesPage } from '@/lib/data/exercises'
 import { getSignedMediaUrls } from '@/lib/supabase/storage'
 import { BODY_PARTS, bodyPartLabel } from '@/lib/exercises/labels'
 
-function buildHref(q?: string, part?: string) {
+const PAGE_SIZE = 60
+
+function buildHref(q?: string, part?: string, page?: number) {
   const params = new URLSearchParams()
   if (q) params.set('q', q)
   if (part) params.set('part', part)
+  if (page && page > 1) params.set('page', String(page))
   const qs = params.toString()
   return qs ? `/exercises?${qs}` : '/exercises'
 }
@@ -35,13 +39,63 @@ function Chip({
   )
 }
 
+function PaginationLink({
+  href,
+  disabled,
+  direction,
+  children,
+}: {
+  href: string
+  disabled?: boolean
+  direction: 'prev' | 'next'
+  children: React.ReactNode
+}) {
+  const Icon = direction === 'prev' ? ChevronLeft : ChevronRight
+  const content = (
+    <>
+      {direction === 'prev' && <Icon size={17} strokeWidth={1.75} />}
+      {children}
+      {direction === 'next' && <Icon size={17} strokeWidth={1.75} />}
+    </>
+  )
+
+  if (disabled) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg border border-white/5 px-3 py-2 text-sm text-text-disabled">
+        {content}
+      </span>
+    )
+  }
+
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
+    >
+      {content}
+    </Link>
+  )
+}
+
 export default async function ExercisesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; part?: string }>
+  searchParams: Promise<{ q?: string; part?: string; page?: string }>
 }) {
-  const { q, part } = await searchParams
-  const exercises = await listExercises({ search: q, bodyPart: part })
+  const { q, part, page: pageParam } = await searchParams
+  const page = Math.max(1, Number(pageParam) || 1)
+  const { exercises, total } = await listExercisesPage({
+    search: q,
+    bodyPart: part,
+    page,
+    pageSize: PAGE_SIZE,
+  })
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  if (total > 0 && page > totalPages) {
+    redirect(buildHref(q, part, totalPages))
+  }
+  const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const to = Math.min(page * PAGE_SIZE, total)
 
   const paths = exercises
     .map((e) => e.image_url)
@@ -76,6 +130,19 @@ export default async function ExercisesPage({
             {bodyPartLabel(bp)}
           </Chip>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between gap-3 text-sm text-text-muted">
+        <p>
+          {total === 0
+            ? '0 ejercicios'
+            : `${from}-${to} de ${total} ejercicios`}
+        </p>
+        {totalPages > 1 && (
+          <p className="font-mono text-xs">
+            Página {page} / {totalPages}
+          </p>
+        )}
       </div>
 
       {exercises.length === 0 ? (
@@ -125,6 +192,28 @@ export default async function ExercisesPage({
             )
           })}
         </ul>
+      )}
+
+      {totalPages > 1 && (
+        <nav
+          aria-label="Paginación de ejercicios"
+          className="flex items-center justify-between border-t border-white/5 pt-4"
+        >
+          <PaginationLink
+            href={buildHref(q, part, page - 1)}
+            direction="prev"
+            disabled={page <= 1}
+          >
+            Anterior
+          </PaginationLink>
+          <PaginationLink
+            href={buildHref(q, part, page + 1)}
+            direction="next"
+            disabled={page >= totalPages}
+          >
+            Siguiente
+          </PaginationLink>
+        </nav>
       )}
     </div>
   )

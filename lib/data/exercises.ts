@@ -188,6 +188,46 @@ export async function listExercises(opts?: {
   return data ?? []
 }
 
+export async function listExercisesPage(opts?: {
+  search?: string
+  bodyPart?: string
+  page?: number
+  pageSize?: number
+}): Promise<{ exercises: ExerciseListItem[]; total: number }> {
+  const page = Math.max(1, opts?.page ?? 1)
+  const pageSize = opts?.pageSize ?? 60
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+
+  const supabase = await createClient()
+  let query = supabase
+    .from('exercises')
+    .select(LIST_COLUMNS, { count: 'exact' })
+    .order('name', { ascending: true })
+    .range(from, to)
+
+  if (opts?.search) {
+    const terms = expandSearchTerms(opts.search)
+    const filters = terms.flatMap((term) => [
+      `name.ilike.%${term}%`,
+      `equipment.ilike.%${term}%`,
+      `body_part.ilike.%${term}%`,
+      `muscle_group.ilike.%${term}%`,
+      `target.ilike.%${term}%`,
+    ])
+    query = query.or(filters.join(','))
+  }
+  if (opts?.bodyPart) query = query.eq('body_part', opts.bodyPart)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message)
+
+  return {
+    exercises: data ?? [],
+    total: count ?? 0,
+  }
+}
+
 export async function getExercise(id: string): Promise<ExerciseDetail | null> {
   const supabase = await createClient()
   const { data, error } = await supabase
