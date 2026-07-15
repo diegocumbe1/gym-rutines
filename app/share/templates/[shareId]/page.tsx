@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
-import { Dumbbell } from 'lucide-react'
 import { getPublicTemplate } from '@/lib/data/public-share'
 import { bodyPartLabel } from '@/lib/exercises/labels'
+import { BrandMark } from '@/components/brand/brand-mark'
 
 export default async function PublicTemplatePage({
   params,
@@ -17,9 +17,7 @@ export default async function PublicTemplatePage({
       <div className="space-y-5">
         <div className="border-b border-white/10 pb-5">
           <div className="flex items-center gap-2">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary">
-              <Dumbbell size={18} strokeWidth={1.75} />
-            </div>
+            <BrandMark size="md" />
             <p className="font-semibold">Gym Routines</p>
           </div>
         </div>

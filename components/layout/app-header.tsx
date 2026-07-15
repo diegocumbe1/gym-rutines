@@ -1,13 +1,12 @@
-import { Dumbbell, LogOut } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { logout } from '@/app/actions/auth'
+import { BrandMark } from '@/components/brand/brand-mark'
 
 export function AppHeader() {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-white/5 bg-background/80 px-5 py-3.5 backdrop-blur-xl">
       <div className="flex items-center gap-2">
-        <div className="flex size-7 items-center justify-center rounded-lg bg-primary">
-          <Dumbbell size={16} strokeWidth={1.75} className="text-text-primary" />
-        </div>
+        <BrandMark size="sm" />
         <span className="text-sm font-semibold">Gym Routines</span>
       </div>
 
