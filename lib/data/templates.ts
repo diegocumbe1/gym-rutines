@@ -23,6 +23,12 @@ export type TemplateExercise = {
     name: string
     body_part: string | null
     muscle_group: string | null
+    equipment?: string | null
+    target?: string | null
+    image_url?: string | null
+    gif_url?: string | null
+    instructions?: string | null
+    public_media_url?: string | null
   } | null
 }
 
@@ -61,7 +67,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
     .from('workout_templates')
     .select(
       'id,name,description,is_public,public_share_id,' +
-        'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group))'
+        'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
     )
     .eq('id', id)
     .order('position', { referencedTable: 'template_exercises', ascending: true })

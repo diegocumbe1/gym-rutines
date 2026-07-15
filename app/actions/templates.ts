@@ -207,6 +207,52 @@ export async function updateTemplateExercises(formData: FormData) {
   revalidatePath(`/templates/${templateId}`)
 }
 
+export async function moveTemplateExercise(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+  const templateId = String(formData.get('template_id'))
+  const direction = String(formData.get('direction'))
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('template_exercises')
+    .select('id,position')
+    .eq('template_id', templateId)
+    .eq('user_id', userId)
+    .order('position', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  const rows = data ?? []
+  const index = rows.findIndex((row) => row.id === id)
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  const current = rows[index]
+  const target = rows[targetIndex]
+
+  if (!current || !target) {
+    revalidatePath(`/templates/${templateId}`)
+    return
+  }
+
+  const { error: currentError } = await supabase
+    .from('template_exercises')
+    .update({ position: target.position })
+    .eq('id', current.id)
+    .eq('user_id', userId)
+
+  if (currentError) throw new Error(currentError.message)
+
+  const { error: targetError } = await supabase
+    .from('template_exercises')
+    .update({ position: current.position })
+    .eq('id', target.id)
+    .eq('user_id', userId)
+
+  if (targetError) throw new Error(targetError.message)
+
+  revalidatePath(`/templates/${templateId}`)
+}
+
 export async function removeTemplateExercise(formData: FormData) {
   const { userId } = await verifySession()
   const id = String(formData.get('id'))

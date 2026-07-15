@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { Check, ChevronLeft, Eye, Plus, Search, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Plus, Search, X } from 'lucide-react'
 import { getTemplate } from '@/lib/data/templates'
 import {
   bodyPartFromSearch,
@@ -156,34 +156,36 @@ export default async function AddExercisePage({
               }`}
               style={{ scrollMarginTop: '180px', scrollMarginBottom: '96px' }}
             >
-              <div className="flex items-center justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="line-clamp-1 text-sm font-medium capitalize">
-                    {e.name}
-                  </p>
-                  <p className="text-xs text-text-muted">
-                    {bodyPartLabel(e.body_part)}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <Link
-                    href={isSelected ? addPageHref(id, q) : addPageHref(id, q, e.id)}
-                    scroll={!isSelected}
-                    className="flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-white/20 hover:text-text-primary"
-                  >
+              <div className="flex items-center justify-between gap-2">
+                <Link
+                  href={isSelected ? addPageHref(id, q) : addPageHref(id, q, e.id)}
+                  scroll={!isSelected}
+                  className="flex min-w-0 flex-1 items-center justify-between gap-3 p-3 transition-colors hover:bg-white/[0.02]"
+                >
+                  <div className="min-w-0">
+                    <p className="line-clamp-1 text-sm font-medium capitalize">
+                      {e.name}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {bodyPartLabel(e.body_part)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-text-secondary">
                     {isSelected ? (
                       <X size={15} strokeWidth={1.75} />
                     ) : (
-                      <Eye size={15} strokeWidth={1.75} />
+                      <ChevronDown size={15} strokeWidth={1.75} />
                     )}
                     {isSelected ? 'Cerrar' : 'Detalle'}
-                  </Link>
+                  </div>
+                </Link>
+                <div className="flex shrink-0 items-center gap-2">
                   {added ? (
-                    <span className="flex items-center gap-1 text-xs text-success">
+                    <span className="mr-3 flex items-center gap-1 text-xs text-success">
                       <Check size={16} strokeWidth={2} /> Añadido
                     </span>
                   ) : (
-                    <form action={addExerciseToTemplate}>
+                    <form action={addExerciseToTemplate} className="pr-3">
                       <input type="hidden" name="template_id" value={id} />
                       <input type="hidden" name="exercise_id" value={e.id} />
                       <button

@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
+  ArrowDown,
+  ArrowUp,
   Check,
   CheckCircle2,
-  Eye,
+  ChevronDown,
   Pause,
   Play,
   Timer,
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react'
 import {
   completeWorkoutSession,
+  moveSessionExercise,
   saveWorkoutSet,
   startWorkoutSession,
 } from '@/app/actions/sessions'
@@ -184,6 +187,18 @@ export function WorkoutSessionCard({
     })
   }
 
+  function moveExercise(exerciseId: string, direction: 'up' | 'down') {
+    const data = new FormData()
+    data.set('id', exerciseId)
+    data.set('session_id', session.id)
+    data.set('direction', direction)
+
+    startTransition(async () => {
+      await moveSessionExercise(data)
+      router.refresh()
+    })
+  }
+
   return (
     <section className="crystal-surface rounded-2xl p-4">
       <div className="flex items-start justify-between gap-3">
@@ -272,20 +287,7 @@ export function WorkoutSessionCard({
               className="overflow-hidden rounded-xl border border-white/5 bg-surface/70"
               style={{ scrollMarginTop: '120px', scrollMarginBottom: '96px' }}
             >
-              <div className="flex items-start justify-between gap-3 p-3">
-                <div className="min-w-0">
-                  <p className="text-xs text-text-muted">
-                    {index + 1} · {exercise.muscle_group ?? '-'}
-                  </p>
-                  <p className="line-clamp-1 font-medium capitalize">
-                    {exercise.exercise_name}
-                  </p>
-                  <p className="mt-1 font-mono text-xs text-text-muted">
-                    {done}/{exerciseSets.length} series · {exercise.target_reps_min ?? '-'}
-                    -{exercise.target_reps_max ?? '-'} reps
-                    {exercise.rest_seconds ? ` · ${exercise.rest_seconds}s` : ''}
-                  </p>
-                </div>
+              <div className="grid grid-cols-[1fr_auto] items-stretch">
                 <Link
                   href={
                     detailId === exercise.id
@@ -293,15 +295,50 @@ export function WorkoutSessionCard({
                       : dayHref(selectedDate, exercise.id)
                   }
                   scroll={detailId !== exercise.id}
-                  className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-white/20 hover:text-text-primary"
+                  className="flex min-w-0 items-start justify-between gap-3 p-3 transition-colors hover:bg-white/[0.02]"
                 >
-                  {detailId === exercise.id ? (
-                    <X size={15} strokeWidth={1.75} />
-                  ) : (
-                    <Eye size={15} strokeWidth={1.75} />
-                  )}
-                  {detailId === exercise.id ? 'Cerrar' : 'Detalle'}
+                  <div className="min-w-0">
+                    <p className="text-xs text-text-muted">
+                      {index + 1} · {exercise.muscle_group ?? '-'}
+                    </p>
+                    <p className="line-clamp-1 font-medium capitalize">
+                      {exercise.exercise_name}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-text-muted">
+                      {done}/{exerciseSets.length} series · {exercise.target_reps_min ?? '-'}
+                      -{exercise.target_reps_max ?? '-'} reps
+                      {exercise.rest_seconds ? ` · ${exercise.rest_seconds}s` : ''}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-text-secondary">
+                    {detailId === exercise.id ? (
+                      <X size={15} strokeWidth={1.75} />
+                    ) : (
+                      <ChevronDown size={15} strokeWidth={1.75} />
+                    )}
+                    {detailId === exercise.id ? 'Cerrar' : 'Detalle'}
+                  </div>
                 </Link>
+                <div className="flex border-l border-white/5">
+                  <button
+                    type="button"
+                    disabled={index === 0 || isPending}
+                    onClick={() => moveExercise(exercise.id, 'up')}
+                    aria-label="Subir ejercicio"
+                    className="flex w-10 items-center justify-center text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary disabled:opacity-30"
+                  >
+                    <ArrowUp size={16} strokeWidth={1.75} />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === session.exercises.length - 1 || isPending}
+                    onClick={() => moveExercise(exercise.id, 'down')}
+                    aria-label="Bajar ejercicio"
+                    className="flex w-10 items-center justify-center text-text-muted transition-colors hover:bg-surface-2 hover:text-text-primary disabled:opacity-30"
+                  >
+                    <ArrowDown size={16} strokeWidth={1.75} />
+                  </button>
+                </div>
               </div>
 
               {hasStarted && (

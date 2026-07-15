@@ -24,6 +24,7 @@ export type SessionExercise = {
     image_url: string | null
     gif_url: string | null
     instructions: string | null
+    public_media_url?: string | null
   } | null
 }
 

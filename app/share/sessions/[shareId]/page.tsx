@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getPublicSession } from '@/lib/data/public-share'
 import { dateLabel } from '@/lib/dates'
 import { BrandMark } from '@/components/brand/brand-mark'
+import { PublicExerciseCard } from '@/components/share/public-exercise-card'
 
 export default async function PublicSessionPage({
   params,
@@ -35,20 +36,18 @@ export default async function PublicSessionPage({
 
         <ol className="space-y-3">
           {session.exercises.map((item, index) => (
-            <li key={item.id} className="crystal-surface rounded-2xl p-4">
-              <p className="text-xs text-text-muted">
-                {index + 1} · {item.muscle_group ?? '—'}
-              </p>
-              <p className="mt-1 font-medium capitalize">
-                {item.exercise_name}
-              </p>
-              <p className="mt-2 font-mono text-xs text-text-muted">
-                {item.target_sets ?? '—'} x {item.target_reps_min ?? '—'}-
-                {item.target_reps_max ?? '—'}
-                {item.target_weight ? ` · sug. ${item.target_weight} kg` : ''}
-                {item.rest_seconds ? ` · ${item.rest_seconds}s` : ''}
-              </p>
-            </li>
+            <PublicExerciseCard
+              key={item.id}
+              index={index}
+              name={item.exercise_name}
+              muscleLabel={item.muscle_group ?? '—'}
+              targetSets={item.target_sets}
+              targetRepsMin={item.target_reps_min}
+              targetRepsMax={item.target_reps_max}
+              targetWeight={item.target_weight}
+              restSeconds={item.rest_seconds}
+              exercise={item.exercise}
+            />
           ))}
         </ol>
       </div>

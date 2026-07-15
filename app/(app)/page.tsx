@@ -10,6 +10,7 @@ import {
 import {
   deleteWorkoutSession,
   enableSessionPublicShare,
+  moveWorkoutSessionDate,
   refreshSessionFromTemplate,
 } from '@/app/actions/sessions'
 import { getSessionsForDate } from '@/lib/data/sessions'
@@ -120,6 +121,74 @@ export default async function TodayPage({
               />
 
               <div className="grid gap-2 rounded-2xl border border-white/5 bg-surface/50 p-3">
+                <div className="grid gap-2 rounded-xl border border-white/5 bg-background/25 p-3">
+                  <p className="text-xs font-medium uppercase text-text-muted">
+                    Mover rutina
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <form action={moveWorkoutSessionDate}>
+                      <input type="hidden" name="id" value={session.id} />
+                      <input
+                        type="hidden"
+                        name="current_date"
+                        value={selectedDate}
+                      />
+                      <input
+                        type="hidden"
+                        name="scheduled_date"
+                        value={today}
+                      />
+                      <button
+                        type="submit"
+                        disabled={selectedDate === today}
+                        className="w-full rounded-lg border border-white/10 py-2 text-xs font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary disabled:opacity-35"
+                      >
+                        Hoy
+                      </button>
+                    </form>
+                    <form action={moveWorkoutSessionDate}>
+                      <input type="hidden" name="id" value={session.id} />
+                      <input
+                        type="hidden"
+                        name="current_date"
+                        value={selectedDate}
+                      />
+                      <input
+                        type="hidden"
+                        name="scheduled_date"
+                        value={tomorrow}
+                      />
+                      <button
+                        type="submit"
+                        disabled={selectedDate === tomorrow}
+                        className="w-full rounded-lg border border-white/10 py-2 text-xs font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary disabled:opacity-35"
+                      >
+                        Mañana
+                      </button>
+                    </form>
+                  </div>
+                  <form action={moveWorkoutSessionDate} className="flex gap-2">
+                    <input type="hidden" name="id" value={session.id} />
+                    <input
+                      type="hidden"
+                      name="current_date"
+                      value={selectedDate}
+                    />
+                    <input
+                      type="date"
+                      name="scheduled_date"
+                      defaultValue={selectedDate}
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-surface-2 px-3 py-2 text-sm text-text-primary outline-none focus:border-highlight"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-primary-hover"
+                    >
+                      Mover
+                    </button>
+                  </form>
+                </div>
+
                 {session.template_id && (
                   <form action={refreshSessionFromTemplate}>
                     <input type="hidden" name="id" value={session.id} />

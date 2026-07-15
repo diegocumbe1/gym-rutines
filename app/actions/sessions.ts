@@ -141,6 +141,29 @@ export async function enableSessionPublicShare(formData: FormData) {
   redirect(date ? `/?date=${date}` : '/')
 }
 
+export async function moveWorkoutSessionDate(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+  const currentDate = String(formData.get('current_date') ?? '')
+  const scheduledDate = String(formData.get('scheduled_date') ?? '').trim()
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+    redirect(currentDate ? `/?date=${currentDate}` : '/')
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('workout_sessions')
+    .update({ scheduled_date: scheduledDate })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  redirect(`/?date=${scheduledDate}`)
+}
+
 export async function deleteWorkoutSession(formData: FormData) {
   const { userId } = await verifySession()
   const id = String(formData.get('id'))
@@ -157,6 +180,53 @@ export async function deleteWorkoutSession(formData: FormData) {
 
   revalidatePath('/')
   redirect(date ? `/?date=${date}` : '/')
+}
+
+export async function moveSessionExercise(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+  const sessionId = String(formData.get('session_id'))
+  const direction = String(formData.get('direction'))
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('session_exercises')
+    .select('id,position')
+    .eq('session_id', sessionId)
+    .eq('user_id', userId)
+    .order('position', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  const rows = data ?? []
+  const index = rows.findIndex((row) => row.id === id)
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  const current = rows[index]
+  const target = rows[targetIndex]
+
+  if (!current || !target) {
+    revalidatePath('/')
+    return { ok: true }
+  }
+
+  const { error: currentError } = await supabase
+    .from('session_exercises')
+    .update({ position: target.position })
+    .eq('id', current.id)
+    .eq('user_id', userId)
+
+  if (currentError) throw new Error(currentError.message)
+
+  const { error: targetError } = await supabase
+    .from('session_exercises')
+    .update({ position: current.position })
+    .eq('id', target.id)
+    .eq('user_id', userId)
+
+  if (targetError) throw new Error(targetError.message)
+
+  revalidatePath('/')
+  return { ok: true }
 }
 
 export async function refreshSessionFromTemplate(formData: FormData) {
