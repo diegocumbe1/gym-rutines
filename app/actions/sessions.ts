@@ -237,3 +237,131 @@ export async function refreshSessionFromTemplate(formData: FormData) {
   revalidatePath('/')
   redirect(date ? `/?date=${date}` : '/')
 }
+
+export async function startWorkoutSession(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+
+  const supabase = await createClient()
+  const { data: session, error: sessionError } = await supabase
+    .from('workout_sessions')
+    .select(
+      'id,status,session_exercises(id,target_sets,target_reps_min,target_reps_max,target_weight)'
+    )
+    .eq('id', id)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (sessionError) throw new Error(sessionError.message)
+  if (!session) return { ok: false }
+
+  const exercises = (session.session_exercises ?? []) as Array<{
+    id: string
+    target_sets: number | null
+    target_reps_min: number | null
+    target_reps_max: number | null
+    target_weight: number | null
+  }>
+  const exerciseIds = exercises.map((exercise) => exercise.id)
+
+  const { data: existingSets, error: setsError } = await supabase
+    .from('workout_sets')
+    .select('session_exercise_id,set_number')
+    .in('session_exercise_id', exerciseIds.length > 0 ? exerciseIds : [''])
+    .eq('user_id', userId)
+
+  if (setsError) throw new Error(setsError.message)
+
+  const existing = new Set(
+    (existingSets ?? []).map(
+      (set) => `${set.session_exercise_id}:${set.set_number}`
+    )
+  )
+  const rows = exercises.flatMap((exercise) => {
+    const targetSets = Math.max(1, exercise.target_sets ?? 1)
+    return Array.from({ length: targetSets }, (_, index) => {
+      const setNumber = index + 1
+      if (existing.has(`${exercise.id}:${setNumber}`)) return null
+      return {
+        user_id: userId,
+        session_exercise_id: exercise.id,
+        set_number: setNumber,
+        target_reps: exercise.target_reps_max ?? exercise.target_reps_min,
+        target_weight: exercise.target_weight,
+      }
+    }).filter(
+      (
+        row
+      ): row is {
+        user_id: string
+        session_exercise_id: string
+        set_number: number
+        target_reps: number | null
+        target_weight: number | null
+      } => Boolean(row)
+    )
+  })
+
+  if (rows.length > 0) {
+    const { error: insertError } = await supabase.from('workout_sets').insert(rows)
+    if (insertError) throw new Error(insertError.message)
+  }
+
+  const { error: updateError } = await supabase
+    .from('workout_sessions')
+    .update({
+      status: 'in_progress',
+      started_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (updateError) throw new Error(updateError.message)
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+export async function saveWorkoutSet(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+  const completed = String(formData.get('is_completed')) === 'true'
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('workout_sets')
+    .update({
+      actual_reps: num(formData, 'actual_reps'),
+      actual_weight: num(formData, 'actual_weight'),
+      rest_seconds: num(formData, 'rest_seconds'),
+      is_completed: completed,
+      completed_at: completed ? new Date().toISOString() : null,
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+export async function completeWorkoutSession(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('workout_sessions')
+    .update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  return { ok: true }
+}

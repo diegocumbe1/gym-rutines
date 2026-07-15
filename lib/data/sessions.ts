@@ -13,6 +13,7 @@ export type SessionExercise = {
   target_reps_max: number | null
   target_weight: number | null
   rest_seconds: number | null
+  workout_sets: WorkoutSet[]
   exercise: {
     id: string
     name: string
@@ -24,6 +25,18 @@ export type SessionExercise = {
     gif_url: string | null
     instructions: string | null
   } | null
+}
+
+export type WorkoutSet = {
+  id: string
+  set_number: number
+  target_reps: number | null
+  target_weight: number | null
+  actual_reps: number | null
+  actual_weight: number | null
+  rest_seconds: number | null
+  is_completed: boolean
+  completed_at: string | null
 }
 
 export type WorkoutSession = {
@@ -45,7 +58,7 @@ export async function getSessionsForDate(
     .from('workout_sessions')
     .select(
       'id,template_id,title,scheduled_date,status,is_public,public_share_id,' +
-        'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
+        'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,workout_sets(id,set_number,target_reps,target_weight,actual_reps,actual_weight,rest_seconds,is_completed,completed_at),exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
     )
     .eq('scheduled_date', scheduledDate)
     .order('created_at', { ascending: true })
@@ -73,6 +86,13 @@ export async function getSessionsForDate(
     is_public: session.is_public,
     public_share_id: session.public_share_id,
     exercises:
-      session.session_exercises?.sort((a, b) => a.position - b.position) ?? [],
+      session.session_exercises
+        ?.sort((a, b) => a.position - b.position)
+        .map((exercise) => ({
+          ...exercise,
+          workout_sets:
+            exercise.workout_sets?.sort((a, b) => a.set_number - b.set_number) ??
+            [],
+        })) ?? [],
   }))
 }
