@@ -6,12 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import:exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-exercises.ts",
+    "import:free-exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-free-exercise-db.ts",
+    "upload:media": "node --env-file=.env.local --experimental-strip-types scripts/upload-media.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.5",
+    "lucide-react": "^1.24.0",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

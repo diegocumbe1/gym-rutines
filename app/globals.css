@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
+/* =============================================================================
+   Midnight Crystal — sistema de diseño (dark-first, lujo, rendimiento)
+   ============================================================================= */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
+
+  --background: #05070c;
+  --surface: #0a0f18;
+  --surface-2: #101827;
+  --surface-3: #162033;
+
+  --primary: #14213d;
+  --primary-hover: #1b2f56;
+  --primary-light: #274690;
+  --highlight: #315da8;
+
+  --text-primary: #fafafa;
+  --text-secondary: #d1d5db;
+  --text-muted: #9ca3af;
+  --text-disabled: #6b7280;
+
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #38bdf8;
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-highlight: var(--highlight);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Inter para cuerpo/UI, JetBrains Mono para datos numéricos de rendimiento.
+     Satoshi (títulos) se puede añadir intencionalmente más adelante. */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Materiales crystal — usar con moderación. */
+.crystal-surface {
+  background: rgba(20, 33, 61, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(20px);
+}
+
+.crystal-highlight {
+  border: 1px solid rgba(49, 93, 168, 0.25);
+  box-shadow: 0 0 30px rgba(49, 93, 168, 0.15);
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Midnight Crystal Design"
+  short_description: "Apply the Gym Rutines luxury performance brand system."
+  default_prompt: "Use $midnight-crystal-design to design or refine a Gym Rutines UI."
