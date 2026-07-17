@@ -1,6 +1,11 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import type { TrackingType } from '@/lib/workouts/tracking'
+
+const LEGACY_SESSION_SELECT =
+  'id,template_id,title,scheduled_date,status,is_public,public_share_id,' +
+  'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,workout_sets(id,set_number,target_reps,target_weight,actual_reps,actual_weight,rest_seconds,is_completed,completed_at),exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
 
 export type SessionExercise = {
   id: string
@@ -13,6 +18,11 @@ export type SessionExercise = {
   target_reps_max: number | null
   target_weight: number | null
   rest_seconds: number | null
+  tracking_type: TrackingType
+  target_duration_seconds: number | null
+  actual_duration_seconds: number | null
+  is_completed: boolean
+  completed_at: string | null
   workout_sets: WorkoutSet[]
   exercise: {
     id: string
@@ -46,6 +56,8 @@ export type WorkoutSession = {
   title: string
   scheduled_date: string
   status: string
+  started_at: string | null
+  completed_at: string | null
   is_public: boolean
   public_share_id: string | null
   exercises: SessionExercise[]
@@ -57,10 +69,7 @@ export async function getSessionsForDate(
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('workout_sessions')
-    .select(
-      'id,template_id,title,scheduled_date,status,is_public,public_share_id,' +
-        'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,workout_sets(id,set_number,target_reps,target_weight,actual_reps,actual_weight,rest_seconds,is_completed,completed_at),exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
-    )
+    .select(LEGACY_SESSION_SELECT)
     .eq('scheduled_date', scheduledDate)
     .order('created_at', { ascending: true })
     .order('position', { referencedTable: 'session_exercises', ascending: true })
@@ -73,6 +82,8 @@ export async function getSessionsForDate(
     title: string
     scheduled_date: string
     status: string
+    started_at: string | null
+    completed_at: string | null
     is_public: boolean
     public_share_id: string | null
     session_exercises: SessionExercise[] | null
@@ -84,6 +95,8 @@ export async function getSessionsForDate(
     title: session.title,
     scheduled_date: session.scheduled_date,
     status: session.status,
+    started_at: session.started_at,
+    completed_at: session.completed_at,
     is_public: session.is_public,
     public_share_id: session.public_share_id,
     exercises:
@@ -91,6 +104,11 @@ export async function getSessionsForDate(
         ?.sort((a, b) => a.position - b.position)
         .map((exercise) => ({
           ...exercise,
+          tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+          target_duration_seconds: exercise.target_duration_seconds ?? null,
+          actual_duration_seconds: exercise.actual_duration_seconds ?? null,
+          is_completed: exercise.is_completed ?? false,
+          completed_at: exercise.completed_at ?? null,
           workout_sets:
             exercise.workout_sets?.sort((a, b) => a.set_number - b.set_number) ??
             [],

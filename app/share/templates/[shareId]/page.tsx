@@ -44,6 +44,8 @@ export default async function PublicTemplatePage({
               targetRepsMax={item.target_reps_max}
               targetWeight={item.target_weight}
               restSeconds={item.rest_seconds}
+              trackingType={item.tracking_type}
+              targetDurationSeconds={item.target_duration_seconds}
               exercise={item.exercise}
             />
           ))}

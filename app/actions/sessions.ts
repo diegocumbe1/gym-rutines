@@ -5,6 +5,12 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { verifySession } from '@/lib/dal'
 import { addDays, todayDateString } from '@/lib/dates'
+import {
+  isTrackingType,
+  tracksSets,
+  tracksWeight,
+  type TrackingType,
+} from '@/lib/workouts/tracking'
 
 function num(formData: FormData, key: string): number | null {
   const value = formData.get(key)
@@ -28,7 +34,7 @@ async function scheduleTemplateSessionForDate(
   const { data: template, error } = await supabase
     .from('workout_templates')
     .select(
-      'id,name,template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,muscle_group))'
+      'id,name,template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,tracking_type,target_duration_seconds,notes,exercise:exercises(id,name,muscle_group))'
     )
     .eq('id', templateId)
     .eq('user_id', userId)
@@ -47,6 +53,8 @@ async function scheduleTemplateSessionForDate(
           target_reps_max: number | null
           target_weight: number | null
           rest_seconds: number | null
+          tracking_type: TrackingType
+          target_duration_seconds: number | null
           notes: string | null
           exercise: {
             id: string
@@ -79,20 +87,40 @@ async function scheduleTemplateSessionForDate(
     throw new Error(sessionError?.message ?? 'No se pudo programar la rutina.')
   }
 
-  const rows = exercises.map((item, index) => ({
-    user_id: userId,
-    session_id: session.id,
-    exercise_id: item.exercise?.id ?? null,
-    position: index,
-    exercise_name: item.notes?.trim() || item.exercise?.name || 'Ejercicio',
-    muscle_group: item.exercise?.muscle_group ?? null,
-    target_sets: num(formData, `target_sets_${item.id}`),
-    target_reps_min: num(formData, `target_reps_min_${item.id}`),
-    target_reps_max: num(formData, `target_reps_max_${item.id}`),
-    target_weight: num(formData, `target_weight_${item.id}`),
-    rest_seconds: num(formData, `rest_seconds_${item.id}`),
-    notes: item.notes,
-  }))
+  const rows = exercises.map((item, index) => {
+    const formTrackingType = String(
+      formData.get(`tracking_type_${item.id}`) ?? ''
+    )
+    const type = isTrackingType(formTrackingType)
+      ? formTrackingType
+      : item.tracking_type
+
+    return {
+      user_id: userId,
+      session_id: session.id,
+      exercise_id: item.exercise?.id ?? null,
+      position: index,
+      exercise_name: item.notes?.trim() || item.exercise?.name || 'Ejercicio',
+      muscle_group: item.exercise?.muscle_group ?? null,
+      tracking_type: type,
+      target_sets: tracksSets(type) ? num(formData, `target_sets_${item.id}`) : null,
+      target_reps_min: tracksSets(type)
+        ? num(formData, `target_reps_min_${item.id}`)
+        : null,
+      target_reps_max: tracksSets(type)
+        ? num(formData, `target_reps_max_${item.id}`)
+        : null,
+      target_weight: tracksWeight(type)
+        ? num(formData, `target_weight_${item.id}`)
+        : null,
+      target_duration_seconds:
+        type === 'duration'
+          ? num(formData, `target_duration_seconds_${item.id}`)
+          : null,
+      rest_seconds: num(formData, `rest_seconds_${item.id}`),
+      notes: item.notes,
+    }
+  })
 
   const { error: exercisesError } = await supabase
     .from('session_exercises')
@@ -187,6 +215,7 @@ export async function moveSessionExercise(formData: FormData) {
   const id = String(formData.get('id'))
   const sessionId = String(formData.get('session_id'))
   const direction = String(formData.get('direction'))
+  const targetPosition = num(formData, 'target_position')
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -200,7 +229,8 @@ export async function moveSessionExercise(formData: FormData) {
 
   const rows = data ?? []
   const index = rows.findIndex((row) => row.id === id)
-  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  const targetIndex =
+    targetPosition === null ? (direction === 'up' ? index - 1 : index + 1) : targetPosition
   const current = rows[index]
   const target = rows[targetIndex]
 
@@ -209,21 +239,19 @@ export async function moveSessionExercise(formData: FormData) {
     return { ok: true }
   }
 
-  const { error: currentError } = await supabase
-    .from('session_exercises')
-    .update({ position: target.position })
-    .eq('id', current.id)
-    .eq('user_id', userId)
+  const reordered = [...rows]
+  reordered.splice(index, 1)
+  reordered.splice(targetIndex, 0, current)
 
-  if (currentError) throw new Error(currentError.message)
+  for (const [position, row] of reordered.entries()) {
+    const { error: positionError } = await supabase
+      .from('session_exercises')
+      .update({ position })
+      .eq('id', row.id)
+      .eq('user_id', userId)
 
-  const { error: targetError } = await supabase
-    .from('session_exercises')
-    .update({ position: current.position })
-    .eq('id', target.id)
-    .eq('user_id', userId)
-
-  if (targetError) throw new Error(targetError.message)
+    if (positionError) throw new Error(positionError.message)
+  }
 
   revalidatePath('/')
   return { ok: true }
@@ -248,7 +276,7 @@ export async function refreshSessionFromTemplate(formData: FormData) {
   const { data: template, error: templateError } = await supabase
     .from('workout_templates')
     .select(
-      'id,template_exercises(position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,muscle_group))'
+      'id,template_exercises(position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,tracking_type,target_duration_seconds,notes,exercise:exercises(id,name,muscle_group))'
     )
     .eq('id', session.template_id)
     .eq('user_id', userId)
@@ -266,6 +294,8 @@ export async function refreshSessionFromTemplate(formData: FormData) {
           target_reps_max: number | null
           target_weight: number | null
           rest_seconds: number | null
+          tracking_type: TrackingType
+          target_duration_seconds: number | null
           notes: string | null
           exercise: {
             id: string
@@ -290,10 +320,12 @@ export async function refreshSessionFromTemplate(formData: FormData) {
       position: index,
       exercise_name: item.notes?.trim() || item.exercise?.name || 'Ejercicio',
       muscle_group: item.exercise?.muscle_group ?? null,
+      tracking_type: item.tracking_type,
       target_sets: item.target_sets,
       target_reps_min: item.target_reps_min,
       target_reps_max: item.target_reps_max,
       target_weight: item.target_weight,
+      target_duration_seconds: item.target_duration_seconds,
       rest_seconds: item.rest_seconds,
       notes: item.notes,
     }))
@@ -316,7 +348,7 @@ export async function startWorkoutSession(formData: FormData) {
   const { data: session, error: sessionError } = await supabase
     .from('workout_sessions')
     .select(
-      'id,status,session_exercises(id,target_sets,target_reps_min,target_reps_max,target_weight)'
+      'id,status,started_at,session_exercises(id,tracking_type,target_sets,target_reps_min,target_reps_max,target_weight)'
     )
     .eq('id', id)
     .eq('user_id', userId)
@@ -331,8 +363,12 @@ export async function startWorkoutSession(formData: FormData) {
     target_reps_min: number | null
     target_reps_max: number | null
     target_weight: number | null
+    tracking_type: TrackingType
   }>
-  const exerciseIds = exercises.map((exercise) => exercise.id)
+  const setTrackedExercises = exercises.filter((exercise) =>
+    tracksSets(exercise.tracking_type)
+  )
+  const exerciseIds = setTrackedExercises.map((exercise) => exercise.id)
 
   const { data: existingSets, error: setsError } = await supabase
     .from('workout_sets')
@@ -347,7 +383,7 @@ export async function startWorkoutSession(formData: FormData) {
       (set) => `${set.session_exercise_id}:${set.set_number}`
     )
   )
-  const rows = exercises.flatMap((exercise) => {
+  const rows = setTrackedExercises.flatMap((exercise) => {
     const targetSets = Math.max(1, exercise.target_sets ?? 1)
     return Array.from({ length: targetSets }, (_, index) => {
       const setNumber = index + 1
@@ -357,7 +393,9 @@ export async function startWorkoutSession(formData: FormData) {
         session_exercise_id: exercise.id,
         set_number: setNumber,
         target_reps: exercise.target_reps_max ?? exercise.target_reps_min,
-        target_weight: exercise.target_weight,
+        target_weight: tracksWeight(exercise.tracking_type)
+          ? exercise.target_weight
+          : null,
       }
     }).filter(
       (
@@ -381,7 +419,7 @@ export async function startWorkoutSession(formData: FormData) {
     .from('workout_sessions')
     .update({
       status: 'in_progress',
-      started_at: new Date().toISOString(),
+      started_at: session.started_at ?? new Date().toISOString(),
     })
     .eq('id', id)
     .eq('user_id', userId)
@@ -404,6 +442,31 @@ export async function saveWorkoutSet(formData: FormData) {
       actual_reps: num(formData, 'actual_reps'),
       actual_weight: num(formData, 'actual_weight'),
       rest_seconds: num(formData, 'rest_seconds'),
+      is_completed: completed,
+      completed_at: completed ? new Date().toISOString() : null,
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath('/')
+  return { ok: true }
+}
+
+export async function saveSessionExercise(formData: FormData) {
+  const { userId } = await verifySession()
+  const id = String(formData.get('id'))
+  const completed = String(formData.get('is_completed')) === 'true'
+  const rawTrackingType = String(formData.get('tracking_type') ?? '')
+  const type = isTrackingType(rawTrackingType) ? rawTrackingType : 'single'
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('session_exercises')
+    .update({
+      actual_duration_seconds:
+        type === 'duration' ? num(formData, 'actual_duration_seconds') : null,
       is_completed: completed,
       completed_at: completed ? new Date().toISOString() : null,
     })

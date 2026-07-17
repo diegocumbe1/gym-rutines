@@ -27,6 +27,14 @@ import {
 } from '@/app/actions/sessions'
 import { bodyPartLabel } from '@/lib/exercises/labels'
 import { getSignedMediaUrls } from '@/lib/supabase/storage'
+import { CopyPublicLinkButton } from '@/components/share/copy-public-link-button'
+import {
+  TRACKING_TYPES,
+  formatDuration,
+  trackingTypeLabel,
+  tracksSets,
+  tracksWeight,
+} from '@/lib/workouts/tracking'
 
 function Field({
   label,
@@ -54,6 +62,7 @@ function Field({
 function ExerciseRow({
   te,
   index,
+  totalCount,
   defaultSelected,
   mediaUrl,
   canMoveUp,
@@ -61,6 +70,7 @@ function ExerciseRow({
 }: {
   te: TemplateExercise
   index: number
+  totalCount: number
   defaultSelected: boolean
   mediaUrl: string | null
   canMoveUp: boolean
@@ -69,6 +79,9 @@ function ExerciseRow({
   const removeFormId = `remove-template-exercise-${te.id}`
   const moveUpFormId = `move-template-exercise-up-${te.id}`
   const moveDownFormId = `move-template-exercise-down-${te.id}`
+  const moveToFormId = `move-template-exercise-to-${te.id}`
+  const usesSets = tracksSets(te.tracking_type)
+  const usesWeight = tracksWeight(te.tracking_type)
 
   return (
     <li className="crystal-surface relative overflow-hidden rounded-2xl">
@@ -93,6 +106,15 @@ function ExerciseRow({
               </p>
               <p className="line-clamp-1 font-medium capitalize">
                 {te.exercise?.name ?? '—'}
+              </p>
+              <p className="mt-1 font-mono text-xs text-text-muted">
+                {trackingTypeLabel(te.tracking_type)}
+                {usesSets
+                  ? ` · ${te.target_sets ?? '-'} x ${te.target_reps_min ?? '-'}-${te.target_reps_max ?? '-'}`
+                  : ''}
+                {te.tracking_type === 'duration'
+                  ? ` · ${formatDuration(te.target_duration_seconds) || 'sin tiempo'}`
+                  : ''}
               </p>
             </div>
           </div>
@@ -171,7 +193,7 @@ function ExerciseRow({
       </button>
 
       <div className="space-y-3 border-t border-white/5 p-4">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
           <button
             type="submit"
             form={moveUpFormId}
@@ -188,15 +210,76 @@ function ExerciseRow({
           >
             <ArrowDown size={15} strokeWidth={1.75} /> Bajar
           </button>
+          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-surface-2 px-2 text-xs font-semibold text-text-secondary">
+            <span className="sr-only">Mover a posición</span>
+            <select
+              name="target_position"
+              form={moveToFormId}
+              defaultValue={index}
+              className="w-14 bg-transparent py-2 text-center font-mono text-text-primary outline-none"
+              aria-label="Mover a posición"
+            >
+              {Array.from({ length: totalCount }, (_, position) => (
+                <option key={position} value={position} className="bg-surface-2">
+                  {position + 1}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              form={moveToFormId}
+              className="text-text-secondary transition-colors hover:text-text-primary"
+            >
+              Mover
+            </button>
+          </label>
         </div>
 
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid gap-2">
           <input type="hidden" name="template_exercise_id" value={te.id} />
-          <Field label="Series" name={`target_sets_${te.id}`} defaultValue={te.target_sets} />
-          <Field label="Rep min" name={`target_reps_min_${te.id}`} defaultValue={te.target_reps_min} />
-          <Field label="Rep max" name={`target_reps_max_${te.id}`} defaultValue={te.target_reps_max} />
-          <Field label="Peso sug." name={`target_weight_${te.id}`} defaultValue={te.target_weight} />
-          <Field label="Desc s" name={`rest_seconds_${te.id}`} defaultValue={te.rest_seconds} />
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] text-text-muted">Tipo</span>
+            <select
+              name={`tracking_type_${te.id}`}
+              defaultValue={te.tracking_type}
+              className="w-full rounded-lg border border-white/10 bg-surface-2 px-2 py-2 text-sm text-text-primary outline-none focus:border-highlight"
+            >
+              {TRACKING_TYPES.map((type) => (
+                <option key={type} value={type} className="bg-surface-2">
+                  {trackingTypeLabel(type)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {usesSets ? (
+            <div
+              className={`grid gap-1.5 ${
+                usesWeight ? 'grid-cols-5' : 'grid-cols-4'
+              }`}
+            >
+              <Field label="Series" name={`target_sets_${te.id}`} defaultValue={te.target_sets} />
+              <Field label="Rep min" name={`target_reps_min_${te.id}`} defaultValue={te.target_reps_min} />
+              <Field label="Rep max" name={`target_reps_max_${te.id}`} defaultValue={te.target_reps_max} />
+              {usesWeight && (
+                <Field label="Peso sug." name={`target_weight_${te.id}`} defaultValue={te.target_weight} />
+              )}
+              <Field label="Desc s" name={`rest_seconds_${te.id}`} defaultValue={te.rest_seconds} />
+            </div>
+          ) : te.tracking_type === 'duration' ? (
+            <div className="grid grid-cols-2 gap-1.5">
+              <Field
+                label="Duración s"
+                name={`target_duration_seconds_${te.id}`}
+                defaultValue={te.target_duration_seconds}
+              />
+              <Field label="Desc s" name={`rest_seconds_${te.id}`} defaultValue={te.rest_seconds} />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-1.5">
+              <Field label="Desc s" name={`rest_seconds_${te.id}`} defaultValue={te.rest_seconds} />
+            </div>
+          )}
         </div>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] text-text-muted">
@@ -290,12 +373,17 @@ export default async function TemplateDetailPage({
           </p>
         </div>
         {template.is_public && template.public_share_id ? (
-          <Link
-            href={`/share/templates/${template.public_share_id}`}
-            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
-          >
-            <ExternalLink size={16} strokeWidth={1.75} /> Abrir link público
-          </Link>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Link
+              href={`/share/templates/${template.public_share_id}`}
+              className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
+            >
+              <ExternalLink size={16} strokeWidth={1.75} /> Ir a enlace público
+            </Link>
+            <CopyPublicLinkButton
+              path={`/share/templates/${template.public_share_id}`}
+            />
+          </div>
         ) : (
           <form action={enableTemplatePublicShare}>
             <input type="hidden" name="id" value={template.id} />
@@ -341,6 +429,7 @@ export default async function TemplateDetailPage({
                 key={te.id}
                 te={te}
                 index={i}
+                totalCount={template.exercises.length}
                 defaultSelected
                 canMoveUp={i > 0}
                 canMoveDown={i < template.exercises.length - 1}
@@ -387,6 +476,13 @@ export default async function TemplateDetailPage({
             <input type="hidden" name="id" value={te.id} />
             <input type="hidden" name="template_id" value={template.id} />
             <input type="hidden" name="direction" value="down" />
+          </form>
+          <form
+            id={`move-template-exercise-to-${te.id}`}
+            action={moveTemplateExercise}
+          >
+            <input type="hidden" name="id" value={te.id} />
+            <input type="hidden" name="template_id" value={template.id} />
           </form>
         </div>
       ))}

@@ -17,6 +17,7 @@ import { getSessionsForDate } from '@/lib/data/sessions'
 import { getSignedMediaUrl } from '@/lib/supabase/storage'
 import { addDays, dateLabel, todayDateString } from '@/lib/dates'
 import { WorkoutSessionCard } from '@/components/workouts/workout-session-card'
+import { CopyPublicLinkButton } from '@/components/share/copy-public-link-button'
 
 function dayHref(date: string, detailId?: string) {
   const today = todayDateString()
@@ -202,12 +203,17 @@ export default async function TodayPage({
                   </form>
                 )}
                 {session.is_public && session.public_share_id ? (
-                  <Link
-                    href={`/share/sessions/${session.public_share_id}`}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
-                  >
-                    <ExternalLink size={16} strokeWidth={1.75} /> Abrir link público
-                  </Link>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Link
+                      href={`/share/sessions/${session.public_share_id}`}
+                      className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-2.5 text-sm font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
+                    >
+                      <ExternalLink size={16} strokeWidth={1.75} /> Ir a enlace público
+                    </Link>
+                    <CopyPublicLinkButton
+                      path={`/share/sessions/${session.public_share_id}`}
+                    />
+                  </div>
                 ) : (
                   <form action={enableSessionPublicShare}>
                     <input type="hidden" name="id" value={session.id} />

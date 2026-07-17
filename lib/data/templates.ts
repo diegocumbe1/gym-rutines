@@ -1,6 +1,11 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import type { TrackingType } from '@/lib/workouts/tracking'
+
+const LEGACY_TEMPLATE_SELECT =
+  'id,name,description,is_public,public_share_id,' +
+  'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
 
 export type TemplateListItem = {
   id: string
@@ -17,6 +22,8 @@ export type TemplateExercise = {
   target_reps_max: number | null
   target_weight: number | null
   rest_seconds: number | null
+  tracking_type: TrackingType
+  target_duration_seconds: number | null
   notes: string | null
   exercise: {
     id: string
@@ -65,10 +72,7 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('workout_templates')
-    .select(
-      'id,name,description,is_public,public_share_id,' +
-        'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
-    )
+    .select(LEGACY_TEMPLATE_SELECT)
     .eq('id', id)
     .order('position', { referencedTable: 'template_exercises', ascending: true })
     .maybeSingle()
@@ -91,6 +95,11 @@ export async function getTemplate(id: string): Promise<TemplateDetail | null> {
     description: row.description ?? null,
     is_public: row.is_public,
     public_share_id: row.public_share_id,
-    exercises: row.template_exercises ?? [],
+    exercises:
+      row.template_exercises?.map((exercise) => ({
+        ...exercise,
+        tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+        target_duration_seconds: exercise.target_duration_seconds ?? null,
+      })) ?? [],
   }
 }

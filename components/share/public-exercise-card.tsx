@@ -1,5 +1,12 @@
 import { ChevronDown } from 'lucide-react'
 import { bodyPartLabel } from '@/lib/exercises/labels'
+import {
+  formatDuration,
+  trackingTypeLabel,
+  tracksSets,
+  tracksWeight,
+  type TrackingType,
+} from '@/lib/workouts/tracking'
 
 type PublicExercise = {
   name: string
@@ -20,6 +27,8 @@ type PublicExerciseCardProps = {
   targetRepsMax: number | null
   targetWeight: number | null
   restSeconds: number | null
+  trackingType: TrackingType
+  targetDurationSeconds: number | null
   exercise: PublicExercise | null
 }
 
@@ -49,8 +58,11 @@ export function PublicExerciseCard({
   targetRepsMax,
   targetWeight,
   restSeconds,
+  trackingType,
+  targetDurationSeconds,
   exercise,
 }: PublicExerciseCardProps) {
+  const usesSets = tracksSets(trackingType)
   return (
     <li className="crystal-surface overflow-hidden rounded-2xl">
       <details className="group">
@@ -61,8 +73,16 @@ export function PublicExerciseCard({
             </p>
             <p className="mt-1 font-medium capitalize">{name}</p>
             <p className="mt-2 font-mono text-xs text-text-muted">
-              {targetSets ?? '—'} x {targetRepsMin ?? '—'}-{targetRepsMax ?? '—'}
-              {targetWeight ? ` · sug. ${targetWeight} kg` : ''}
+              {trackingTypeLabel(trackingType)}
+              {usesSets
+                ? ` · ${targetSets ?? '—'} x ${targetRepsMin ?? '—'}-${targetRepsMax ?? '—'}`
+                : ''}
+              {tracksWeight(trackingType) && targetWeight
+                ? ` · sug. ${targetWeight} kg`
+                : ''}
+              {trackingType === 'duration'
+                ? ` · ${formatDuration(targetDurationSeconds) || 'sin tiempo'}`
+                : ''}
               {restSeconds ? ` · ${restSeconds}s` : ''}
             </p>
           </div>

@@ -14,7 +14,7 @@ import { updateSession } from '@/lib/supabase/proxy'
  */
 
 // Rutas públicas (accesibles sin sesión). El resto es protegido.
-const PUBLIC_ROUTES = ['/login', '/signup']
+const PUBLIC_ROUTES = ['/login', '/signup', '/share']
 
 function isPublicRoute(pathname: string) {
   return PUBLIC_ROUTES.some(

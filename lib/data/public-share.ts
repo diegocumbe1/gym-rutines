@@ -24,6 +24,20 @@ export type PublicSession = {
 
 type PublicExerciseItem = TemplateExercise | SessionExercise
 
+const LEGACY_PUBLIC_TEMPLATE_SELECT =
+  'id,name,description,' +
+  'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
+
+const LEGACY_PUBLIC_SESSION_SELECT =
+  'id,title,scheduled_date,status,' +
+  'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  )
+}
+
 async function attachPublicMediaUrls<T extends PublicExerciseItem>(
   items: T[]
 ): Promise<T[]> {
@@ -75,13 +89,12 @@ async function attachPublicMediaUrls<T extends PublicExerciseItem>(
 export async function getPublicTemplate(
   shareId: string
 ): Promise<PublicTemplate | null> {
+  if (!isUuid(shareId)) return null
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('workout_templates')
-    .select(
-      'id,name,description,' +
-        'template_exercises(id,position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
-    )
+    .select(LEGACY_PUBLIC_TEMPLATE_SELECT)
     .eq('is_public', true)
     .eq('public_share_id', shareId)
     .maybeSingle()
@@ -98,7 +111,11 @@ export async function getPublicTemplate(
 
   const exercises = (row.template_exercises ?? []).sort(
     (a, b) => a.position - b.position
-  )
+  ).map((exercise) => ({
+    ...exercise,
+    tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+    target_duration_seconds: exercise.target_duration_seconds ?? null,
+  }))
 
   return {
     id: row.id,
@@ -111,13 +128,12 @@ export async function getPublicTemplate(
 export async function getPublicSession(
   shareId: string
 ): Promise<PublicSession | null> {
+  if (!isUuid(shareId)) return null
+
   const supabase = createServiceClient()
   const { data, error } = await supabase
     .from('workout_sessions')
-    .select(
-      'id,title,scheduled_date,status,' +
-        'session_exercises(id,exercise_id,position,exercise_name,muscle_group,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,exercise:exercises(id,name,body_part,muscle_group,equipment,target,image_url,gif_url,instructions))'
-    )
+    .select(LEGACY_PUBLIC_SESSION_SELECT)
     .eq('is_public', true)
     .eq('public_share_id', shareId)
     .maybeSingle()
@@ -135,7 +151,14 @@ export async function getPublicSession(
 
   const exercises = (row.session_exercises ?? []).sort(
     (a, b) => a.position - b.position
-  )
+  ).map((exercise) => ({
+    ...exercise,
+    tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+    target_duration_seconds: exercise.target_duration_seconds ?? null,
+    actual_duration_seconds: exercise.actual_duration_seconds ?? null,
+    is_completed: exercise.is_completed ?? false,
+    completed_at: exercise.completed_at ?? null,
+  }))
 
   return {
     id: row.id,

@@ -4,6 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { verifySession } from '@/lib/dal'
+import {
+  defaultRestSeconds,
+  defaultTrackingForEquipment,
+  isTrackingType,
+  tracksSets,
+  tracksWeight,
+  type TrackingType,
+} from '@/lib/workouts/tracking'
 
 export type TemplateFormState = { error?: string } | undefined
 
@@ -12,6 +20,11 @@ function num(formData: FormData, key: string): number | null {
   if (v === null || v === '') return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
+}
+
+function trackingType(formData: FormData, key: string): TrackingType {
+  const value = String(formData.get(key) ?? '')
+  return isTrackingType(value) ? value : 'sets_reps_weight'
 }
 
 export async function createTemplate(
@@ -57,7 +70,7 @@ export async function duplicateTemplate(formData: FormData) {
   const { data: template, error } = await supabase
     .from('workout_templates')
     .select(
-      'id,name,description,template_exercises(position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,notes,exercise_id)'
+      'id,name,description,template_exercises(position,target_sets,target_reps_min,target_reps_max,target_weight,rest_seconds,tracking_type,target_duration_seconds,notes,exercise_id)'
     )
     .eq('id', id)
     .eq('user_id', userId)
@@ -88,6 +101,8 @@ export async function duplicateTemplate(formData: FormData) {
         target_reps_max: number | null
         target_weight: number | null
         rest_seconds: number | null
+        tracking_type: TrackingType
+        target_duration_seconds: number | null
         notes: string | null
         exercise_id: string
       }>
@@ -142,6 +157,15 @@ export async function addExerciseToTemplate(formData: FormData) {
   const exerciseId = String(formData.get('exercise_id'))
 
   const supabase = await createClient()
+  const { data: exercise } = await supabase
+    .from('exercises')
+    .select('equipment')
+    .eq('id', exerciseId)
+    .maybeSingle()
+
+  const defaultTracking = defaultTrackingForEquipment(
+    (exercise?.equipment as string | null) ?? null
+  )
   const { count } = await supabase
     .from('template_exercises')
     .select('*', { count: 'exact', head: true })
@@ -152,10 +176,13 @@ export async function addExerciseToTemplate(formData: FormData) {
     template_id: templateId,
     exercise_id: exerciseId,
     position: count ?? 0,
-    target_sets: 4,
-    target_reps_min: 8,
-    target_reps_max: 12,
-    rest_seconds: 90,
+    tracking_type: defaultTracking,
+    target_sets: tracksSets(defaultTracking) ? 4 : null,
+    target_reps_min: tracksSets(defaultTracking) ? 8 : null,
+    target_reps_max: tracksSets(defaultTracking) ? 12 : null,
+    target_weight: null,
+    target_duration_seconds: defaultTracking === 'duration' ? 600 : null,
+    rest_seconds: defaultRestSeconds(defaultTracking),
   })
 
   revalidatePath(`/templates/${templateId}/add`)
@@ -168,13 +195,17 @@ export async function updateTemplateExercise(formData: FormData) {
   const templateId = String(formData.get('template_id'))
 
   const supabase = await createClient()
+  const type = trackingType(formData, 'tracking_type')
   await supabase
     .from('template_exercises')
     .update({
-      target_sets: num(formData, 'target_sets'),
-      target_reps_min: num(formData, 'target_reps_min'),
-      target_reps_max: num(formData, 'target_reps_max'),
-      target_weight: num(formData, 'target_weight'),
+      tracking_type: type,
+      target_sets: tracksSets(type) ? num(formData, 'target_sets') : null,
+      target_reps_min: tracksSets(type) ? num(formData, 'target_reps_min') : null,
+      target_reps_max: tracksSets(type) ? num(formData, 'target_reps_max') : null,
+      target_weight: tracksWeight(type) ? num(formData, 'target_weight') : null,
+      target_duration_seconds:
+        type === 'duration' ? num(formData, 'target_duration_seconds') : null,
       rest_seconds: num(formData, 'rest_seconds'),
     })
     .eq('id', id)
@@ -190,13 +221,25 @@ export async function updateTemplateExercises(formData: FormData) {
 
   const supabase = await createClient()
   for (const id of ids) {
+    const type = trackingType(formData, `tracking_type_${id}`)
     await supabase
       .from('template_exercises')
       .update({
-        target_sets: num(formData, `target_sets_${id}`),
-        target_reps_min: num(formData, `target_reps_min_${id}`),
-        target_reps_max: num(formData, `target_reps_max_${id}`),
-        target_weight: num(formData, `target_weight_${id}`),
+        tracking_type: type,
+        target_sets: tracksSets(type) ? num(formData, `target_sets_${id}`) : null,
+        target_reps_min: tracksSets(type)
+          ? num(formData, `target_reps_min_${id}`)
+          : null,
+        target_reps_max: tracksSets(type)
+          ? num(formData, `target_reps_max_${id}`)
+          : null,
+        target_weight: tracksWeight(type)
+          ? num(formData, `target_weight_${id}`)
+          : null,
+        target_duration_seconds:
+          type === 'duration'
+            ? num(formData, `target_duration_seconds_${id}`)
+            : null,
         rest_seconds: num(formData, `rest_seconds_${id}`),
         notes: String(formData.get(`notes_${id}`) ?? '').trim() || null,
       })
@@ -212,6 +255,7 @@ export async function moveTemplateExercise(formData: FormData) {
   const id = String(formData.get('id'))
   const templateId = String(formData.get('template_id'))
   const direction = String(formData.get('direction'))
+  const targetPosition = num(formData, 'target_position')
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -225,7 +269,8 @@ export async function moveTemplateExercise(formData: FormData) {
 
   const rows = data ?? []
   const index = rows.findIndex((row) => row.id === id)
-  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  const targetIndex =
+    targetPosition === null ? (direction === 'up' ? index - 1 : index + 1) : targetPosition
   const current = rows[index]
   const target = rows[targetIndex]
 
@@ -234,21 +279,19 @@ export async function moveTemplateExercise(formData: FormData) {
     return
   }
 
-  const { error: currentError } = await supabase
-    .from('template_exercises')
-    .update({ position: target.position })
-    .eq('id', current.id)
-    .eq('user_id', userId)
+  const reordered = [...rows]
+  reordered.splice(index, 1)
+  reordered.splice(targetIndex, 0, current)
 
-  if (currentError) throw new Error(currentError.message)
+  for (const [position, row] of reordered.entries()) {
+    const { error: positionError } = await supabase
+      .from('template_exercises')
+      .update({ position })
+      .eq('id', row.id)
+      .eq('user_id', userId)
 
-  const { error: targetError } = await supabase
-    .from('template_exercises')
-    .update({ position: current.position })
-    .eq('id', target.id)
-    .eq('user_id', userId)
-
-  if (targetError) throw new Error(targetError.message)
+    if (positionError) throw new Error(positionError.message)
+  }
 
   revalidatePath(`/templates/${templateId}`)
 }
