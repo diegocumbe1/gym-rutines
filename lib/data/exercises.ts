@@ -19,6 +19,10 @@ export type ExerciseDetail = ExerciseListItem & {
   source_attribution: string | null
 }
 
+export type SimilarExercise = ExerciseListItem & {
+  reason: string
+}
+
 const LIST_COLUMNS =
   'id,name,body_part,muscle_group,equipment,target,image_url'
 
@@ -158,6 +162,78 @@ function expandSearchTerms(search: string) {
   return Array.from(terms).map(escapeSearchTerm).filter(Boolean)
 }
 
+function normalizeText(value: string | null | undefined) {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+}
+
+const WEAK_NAME_TOKENS = new Set([
+  'a',
+  'and',
+  'assisted',
+  'barbell',
+  'body',
+  'cable',
+  'dumbbell',
+  'exercise',
+  'lever',
+  'machine',
+  'on',
+  'one',
+  'seated',
+  'single',
+  'smith',
+  'standing',
+  'the',
+  'with',
+])
+
+function nameTokens(value: string) {
+  return normalizeText(value)
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 2 && !WEAK_NAME_TOKENS.has(token))
+}
+
+function sharedTokenCount(a: string, b: string) {
+  const aTokens = new Set(nameTokens(a))
+  const bTokens = new Set(nameTokens(b))
+  return Array.from(aTokens).filter((token) => bTokens.has(token)).length
+}
+
+function recommendationReason(
+  source: ExerciseDetail,
+  candidate: ExerciseListItem
+) {
+  if (source.target && candidate.target === source.target) {
+    return `Mismo objetivo: ${candidate.target}`
+  }
+  if (source.muscle_group && candidate.muscle_group === source.muscle_group) {
+    return `Mismo grupo: ${candidate.muscle_group}`
+  }
+  if (source.body_part && candidate.body_part === source.body_part) {
+    return `Misma zona: ${candidate.body_part}`
+  }
+  return 'Alternativa cercana'
+}
+
+function similarityScore(source: ExerciseDetail, candidate: ExerciseListItem) {
+  let score = 0
+
+  if (source.target && candidate.target === source.target) score += 60
+  if (source.muscle_group && candidate.muscle_group === source.muscle_group) {
+    score += 30
+  }
+  if (source.body_part && candidate.body_part === source.body_part) score += 20
+  if (source.equipment && candidate.equipment === source.equipment) score += 6
+  if (source.equipment && candidate.equipment !== source.equipment) score += 8
+
+  score += Math.min(sharedTokenCount(source.name, candidate.name), 4) * 8
+
+  return score
+}
+
 export async function listExercises(opts?: {
   search?: string
   bodyPart?: string
@@ -240,4 +316,50 @@ export async function getExercise(id: string): Promise<ExerciseDetail | null> {
 
   if (error) throw new Error(error.message)
   return data
+}
+
+export async function listSimilarExercises(
+  exercise: ExerciseDetail,
+  limit = 8
+): Promise<SimilarExercise[]> {
+  const filters = [
+    exercise.body_part ? `body_part.eq.${exercise.body_part}` : null,
+    exercise.muscle_group ? `muscle_group.eq.${exercise.muscle_group}` : null,
+    exercise.target ? `target.eq.${exercise.target}` : null,
+  ].filter((filter): filter is string => Boolean(filter))
+
+  if (filters.length === 0) return []
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('exercises')
+    .select(LIST_COLUMNS)
+    .neq('id', exercise.id)
+    .or(filters.join(','))
+    .limit(80)
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? [])
+    .map((candidate) => ({
+      ...candidate,
+      reason: recommendationReason(exercise, candidate),
+      score: similarityScore(exercise, candidate),
+    }))
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score
+      return a.name.localeCompare(b.name)
+    })
+    .slice(0, limit)
+    .map((candidate) => ({
+      id: candidate.id,
+      name: candidate.name,
+      body_part: candidate.body_part,
+      muscle_group: candidate.muscle_group,
+      equipment: candidate.equipment,
+      target: candidate.target,
+      image_url: candidate.image_url,
+      reason: candidate.reason,
+    }))
 }

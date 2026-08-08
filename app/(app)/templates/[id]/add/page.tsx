@@ -6,10 +6,11 @@ import {
   bodyPartFromSearch,
   getExercise,
   listExercises,
+  listSimilarExercises,
 } from '@/lib/data/exercises'
 import { addExerciseToTemplate } from '@/app/actions/templates'
 import { BODY_PARTS, bodyPartLabel } from '@/lib/exercises/labels'
-import { getSignedMediaUrl } from '@/lib/supabase/storage'
+import { getSignedMediaUrl, getSignedMediaUrls } from '@/lib/supabase/storage'
 
 function addPageHref(templateId: string, query?: string, detailId?: string) {
   const params = new URLSearchParams()
@@ -83,6 +84,14 @@ export default async function AddExercisePage({
   const selectedMedia = selectedExercise
     ? await getSignedMediaUrl(selectedExercise.gif_url ?? selectedExercise.image_url)
     : null
+  const similarExercises = selectedExercise
+    ? await listSimilarExercises(selectedExercise, 6)
+    : []
+  const similarMedia = await getSignedMediaUrls(
+    similarExercises
+      .map((exercise) => exercise.image_url)
+      .filter((path): path is string => Boolean(path))
+  )
   const already = new Set(
     template.exercises.map((te) => te.exercise?.id).filter(Boolean)
   )
@@ -253,6 +262,95 @@ export default async function AddExercisePage({
                             <Plus size={16} strokeWidth={2} /> Añadir ejercicio
                           </button>
                         </form>
+                      )}
+
+                      {similarExercises.length > 0 && (
+                        <div className="space-y-2 border-t border-white/5 pt-3">
+                          <p className="text-xs font-semibold uppercase text-text-muted">
+                            Alternativas similares
+                          </p>
+                          <ul className="grid gap-2">
+                            {similarExercises.map((similar) => {
+                              const similarAlready = already.has(similar.id)
+                              const thumb = similar.image_url
+                                ? similarMedia.get(similar.image_url)
+                                : null
+                              return (
+                                <li
+                                  key={similar.id}
+                                  className="rounded-xl border border-white/5 bg-surface/60 p-2"
+                                >
+                                  <div className="grid grid-cols-[56px_1fr_auto] items-center gap-2">
+                                    <Link
+                                      href={addPageHref(id, q, similar.id)}
+                                      scroll
+                                      className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-surface-2"
+                                      aria-label={`Ver ${similar.name}`}
+                                    >
+                                      {thumb ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                          src={thumb}
+                                          alt={similar.name}
+                                          loading="lazy"
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        <Search
+                                          size={18}
+                                          strokeWidth={1.75}
+                                          className="text-text-disabled"
+                                        />
+                                      )}
+                                    </Link>
+                                    <div className="min-w-0">
+                                      <Link
+                                        href={addPageHref(id, q, similar.id)}
+                                        scroll
+                                        className="line-clamp-1 text-sm font-medium capitalize text-text-primary"
+                                      >
+                                        {similar.name}
+                                      </Link>
+                                      <p className="line-clamp-1 text-xs text-text-muted">
+                                        {bodyPartLabel(similar.body_part)}
+                                        {similar.target ? ` · ${similar.target}` : ''}
+                                      </p>
+                                      <p className="line-clamp-1 text-[11px] text-text-disabled">
+                                        {similar.reason}
+                                        {similar.equipment ? ` · ${similar.equipment}` : ''}
+                                      </p>
+                                    </div>
+                                    {similarAlready ? (
+                                      <span className="flex items-center gap-1 pr-1 text-xs text-success">
+                                        <Check size={15} strokeWidth={2} /> Añadido
+                                      </span>
+                                    ) : (
+                                      <form action={addExerciseToTemplate}>
+                                        <input
+                                          type="hidden"
+                                          name="template_id"
+                                          value={id}
+                                        />
+                                        <input
+                                          type="hidden"
+                                          name="exercise_id"
+                                          value={similar.id}
+                                        />
+                                        <button
+                                          type="submit"
+                                          aria-label={`Añadir ${similar.name}`}
+                                          className="flex size-9 items-center justify-center rounded-lg bg-primary text-text-primary transition-colors hover:bg-primary-hover"
+                                        >
+                                          <Plus size={17} strokeWidth={2} />
+                                        </button>
+                                      </form>
+                                    )}
+                                  </div>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
                       )}
                     </div>
                   </div>

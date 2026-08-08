@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ChevronLeft } from 'lucide-react'
-import { getExercise } from '@/lib/data/exercises'
-import { getSignedMediaUrl } from '@/lib/supabase/storage'
+import { ChevronLeft, ChevronRight, Dumbbell } from 'lucide-react'
+import { getExercise, listSimilarExercises } from '@/lib/data/exercises'
+import { getSignedMediaUrl, getSignedMediaUrls } from '@/lib/supabase/storage'
 import { bodyPartLabel } from '@/lib/exercises/labels'
 
 function Meta({ label, value }: { label: string; value?: string | null }) {
@@ -25,8 +25,13 @@ export default async function ExerciseDetailPage({
   const exercise = await getExercise(id)
   if (!exercise) notFound()
 
-  // El GIF si existe; si no, el thumbnail.
-  const media = await getSignedMediaUrl(exercise.gif_url ?? exercise.image_url)
+  const [media, similar] = await Promise.all([
+    getSignedMediaUrl(exercise.gif_url ?? exercise.image_url),
+    listSimilarExercises(exercise, 8),
+  ])
+  const similarMedia = await getSignedMediaUrls(
+    similar.map((item) => item.image_url).filter((path): path is string => Boolean(path))
+  )
 
   return (
     <div className="space-y-5">
@@ -78,6 +83,65 @@ export default async function ExerciseDetailPage({
             {exercise.instructions}
           </p>
         </div>
+      )}
+
+      {similar.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold text-text-secondary">
+            Alternativas similares
+          </h2>
+          <ul className="grid grid-cols-2 gap-3">
+            {similar.map((item) => {
+              const thumb = item.image_url ? similarMedia.get(item.image_url) : null
+              return (
+                <li key={item.id}>
+                  <Link
+                    href={`/exercises/${item.id}`}
+                    className="crystal-surface block h-full overflow-hidden rounded-2xl transition-colors hover:border-highlight/30"
+                  >
+                    <div className="flex aspect-square items-center justify-center bg-surface-2">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumb}
+                          alt={item.name}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Dumbbell
+                          size={26}
+                          strokeWidth={1.5}
+                          className="text-text-disabled"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-1 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-2 text-sm font-medium capitalize">
+                          {item.name}
+                        </p>
+                        <ChevronRight
+                          size={16}
+                          strokeWidth={1.75}
+                          className="mt-0.5 shrink-0 text-text-muted"
+                        />
+                      </div>
+                      <p className="text-xs text-text-muted">
+                        {bodyPartLabel(item.body_part)}
+                        {item.target ? ` · ${item.target}` : ''}
+                      </p>
+                      <p className="line-clamp-1 text-[11px] text-text-disabled">
+                        {item.reason}
+                        {item.equipment ? ` · ${item.equipment}` : ''}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
       )}
 
       {exercise.source_attribution && (

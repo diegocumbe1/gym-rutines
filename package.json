@@ -9,7 +9,8 @@
     "lint": "eslint",
     "import:exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-exercises.ts",
     "import:free-exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-free-exercise-db.ts",
-    "upload:media": "node --env-file=.env.local --experimental-strip-types scripts/upload-media.ts"
+    "upload:media": "node --env-file=.env.local --experimental-strip-types scripts/upload-media.ts",
+    "seed:templates": "node --env-file=.env.local --experimental-strip-types scripts/seed-workout-templates.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",
