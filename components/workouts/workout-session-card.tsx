@@ -23,6 +23,7 @@ import {
   startWorkoutSession,
 } from '@/app/actions/sessions'
 import type { SessionExercise, WorkoutSession, WorkoutSet } from '@/lib/data/sessions'
+import { todayDateString } from '@/lib/dates'
 import {
   formatDuration,
   trackingTypeLabel,
@@ -32,7 +33,7 @@ import {
 
 function dayHref(date: string, detailId?: string) {
   const params = new URLSearchParams()
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayDateString()
   if (date !== today) params.set('date', date)
   if (detailId) params.set('detail', detailId)
 

@@ -115,3 +115,25 @@ export async function getSessionsForDate(
         })) ?? [],
   }))
 }
+
+export async function getSessionCountsForDates(
+  scheduledDates: string[]
+): Promise<Map<string, number>> {
+  if (scheduledDates.length === 0) return new Map()
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('workout_sessions')
+    .select('scheduled_date')
+    .in('scheduled_date', scheduledDates)
+
+  if (error) throw new Error(error.message)
+
+  const counts = new Map(scheduledDates.map((date) => [date, 0]))
+  for (const row of data ?? []) {
+    const date = String(row.scheduled_date)
+    counts.set(date, (counts.get(date) ?? 0) + 1)
+  }
+
+  return counts
+}

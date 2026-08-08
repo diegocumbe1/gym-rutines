@@ -23,9 +23,11 @@ import {
 } from '@/app/actions/templates'
 import {
   scheduleTemplateSessionToday,
+  scheduleTemplateSessionOnDate,
   scheduleTemplateSessionTomorrow,
 } from '@/app/actions/sessions'
 import { bodyPartLabel } from '@/lib/exercises/labels'
+import { todayDateString } from '@/lib/dates'
 import { getSignedMediaUrls } from '@/lib/supabase/storage'
 import { CopyPublicLinkButton } from '@/components/share/copy-public-link-button'
 import {
@@ -313,6 +315,7 @@ export default async function TemplateDetailPage({
   const { id } = await params
   const template = await getTemplate(id)
   if (!template) notFound()
+  const today = todayDateString()
   const mediaPaths = template.exercises
     .map((te) => te.exercise?.gif_url ?? te.exercise?.image_url)
     .filter((path): path is string => Boolean(path))
@@ -421,6 +424,26 @@ export default async function TemplateDetailPage({
               className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-3 text-sm font-semibold text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
             >
               <CalendarPlus size={17} strokeWidth={1.75} /> Mañana
+            </button>
+          </div>
+          <div className="grid gap-2 rounded-2xl border border-white/5 bg-surface/50 p-3 sm:grid-cols-[1fr_auto]">
+            <label className="flex min-w-0 flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase text-text-muted">
+                Programar para
+              </span>
+              <input
+                type="date"
+                name="scheduled_date"
+                defaultValue={today}
+                className="w-full rounded-lg border border-white/10 bg-surface-2 px-3 py-2 text-sm text-text-primary outline-none focus:border-highlight"
+              />
+            </label>
+            <button
+              type="submit"
+              formAction={scheduleTemplateSessionOnDate}
+              className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-primary-hover sm:self-end"
+            >
+              <CalendarPlus size={17} strokeWidth={1.75} /> Programar
             </button>
           </div>
           <ol className="space-y-3">

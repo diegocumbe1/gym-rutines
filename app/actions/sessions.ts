@@ -12,22 +12,51 @@ import {
   type TrackingType,
 } from '@/lib/workouts/tracking'
 
+function formValues(formData: FormData, key: string): FormDataEntryValue[] {
+  const directValues = formData.getAll(key)
+  if (directValues.length > 0) return directValues
+
+  return Array.from(formData.entries())
+    .filter(([name]) => name.endsWith(`_${key}`))
+    .map(([, value]) => value)
+}
+
+function formValue(formData: FormData, key: string): FormDataEntryValue | null {
+  return formValues(formData, key)[0] ?? null
+}
+
+function stringValue(formData: FormData, key: string) {
+  return String(formValue(formData, key) ?? '')
+}
+
 function num(formData: FormData, key: string): number | null {
-  const value = formData.get(key)
+  const value = formValue(formData, key)
   if (value === null || value === '') return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
 
-async function scheduleTemplateSessionForDate(
+function numWithFallback(
   formData: FormData,
-  offsetDays: number
-) {
+  key: string,
+  fallback: number | null
+): number | null {
+  const value = formValue(formData, key)
+  if (value === null) return fallback
+  if (value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function validDateOrNull(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
+}
+
+async function scheduleTemplateSessionForDate(formData: FormData, scheduledDate: string) {
   const { userId } = await verifySession()
-  const templateId = String(formData.get('template_id'))
-  const scheduledDate = addDays(todayDateString(), offsetDays)
+  const templateId = stringValue(formData, 'template_id')
   const selectedIds = new Set(
-    formData.getAll('selected_template_exercise_id').map(String)
+    formValues(formData, 'selected_template_exercise_id').map(String)
   )
 
   const supabase = await createClient()
@@ -88,9 +117,7 @@ async function scheduleTemplateSessionForDate(
   }
 
   const rows = exercises.map((item, index) => {
-    const formTrackingType = String(
-      formData.get(`tracking_type_${item.id}`) ?? ''
-    )
+    const formTrackingType = stringValue(formData, `tracking_type_${item.id}`)
     const type = isTrackingType(formTrackingType)
       ? formTrackingType
       : item.tracking_type
@@ -103,21 +130,39 @@ async function scheduleTemplateSessionForDate(
       exercise_name: item.notes?.trim() || item.exercise?.name || 'Ejercicio',
       muscle_group: item.exercise?.muscle_group ?? null,
       tracking_type: type,
-      target_sets: tracksSets(type) ? num(formData, `target_sets_${item.id}`) : null,
+      target_sets: tracksSets(type)
+        ? numWithFallback(formData, `target_sets_${item.id}`, item.target_sets)
+        : null,
       target_reps_min: tracksSets(type)
-        ? num(formData, `target_reps_min_${item.id}`)
+        ? numWithFallback(
+            formData,
+            `target_reps_min_${item.id}`,
+            item.target_reps_min
+          )
         : null,
       target_reps_max: tracksSets(type)
-        ? num(formData, `target_reps_max_${item.id}`)
+        ? numWithFallback(
+            formData,
+            `target_reps_max_${item.id}`,
+            item.target_reps_max
+          )
         : null,
       target_weight: tracksWeight(type)
-        ? num(formData, `target_weight_${item.id}`)
+        ? numWithFallback(formData, `target_weight_${item.id}`, item.target_weight)
         : null,
       target_duration_seconds:
         type === 'duration'
-          ? num(formData, `target_duration_seconds_${item.id}`)
+          ? numWithFallback(
+              formData,
+              `target_duration_seconds_${item.id}`,
+              item.target_duration_seconds
+            )
           : null,
-      rest_seconds: num(formData, `rest_seconds_${item.id}`),
+      rest_seconds: numWithFallback(
+        formData,
+        `rest_seconds_${item.id}`,
+        item.rest_seconds
+      ),
       notes: item.notes,
     }
   })
@@ -129,15 +174,28 @@ async function scheduleTemplateSessionForDate(
   if (exercisesError) throw new Error(exercisesError.message)
 
   revalidatePath('/')
-  redirect(offsetDays === 0 ? '/' : `/?date=${scheduledDate}`)
+  redirect(scheduledDate === todayDateString() ? '/' : `/?date=${scheduledDate}`)
 }
 
 export async function scheduleTemplateSessionToday(formData: FormData) {
-  await scheduleTemplateSessionForDate(formData, 0)
+  await scheduleTemplateSessionForDate(formData, todayDateString())
 }
 
 export async function scheduleTemplateSessionTomorrow(formData: FormData) {
-  await scheduleTemplateSessionForDate(formData, 1)
+  await scheduleTemplateSessionForDate(formData, addDays(todayDateString(), 1))
+}
+
+export async function scheduleTemplateSessionOnDate(formData: FormData) {
+  const templateId = stringValue(formData, 'template_id')
+  const scheduledDate = validDateOrNull(
+    stringValue(formData, 'scheduled_date').trim()
+  )
+
+  if (!scheduledDate) {
+    redirect(`/templates/${templateId}`)
+  }
+
+  await scheduleTemplateSessionForDate(formData, scheduledDate)
 }
 
 export async function enableSessionPublicShare(formData: FormData) {
@@ -175,7 +233,7 @@ export async function moveWorkoutSessionDate(formData: FormData) {
   const currentDate = String(formData.get('current_date') ?? '')
   const scheduledDate = String(formData.get('scheduled_date') ?? '').trim()
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+  if (!validDateOrNull(scheduledDate)) {
     redirect(currentDate ? `/?date=${currentDate}` : '/')
   }
 

@@ -13,9 +13,16 @@ import {
   moveWorkoutSessionDate,
   refreshSessionFromTemplate,
 } from '@/app/actions/sessions'
-import { getSessionsForDate } from '@/lib/data/sessions'
+import { getSessionCountsForDates, getSessionsForDate } from '@/lib/data/sessions'
 import { getSignedMediaUrl } from '@/lib/supabase/storage'
-import { addDays, dateLabel, todayDateString } from '@/lib/dates'
+import {
+  addDays,
+  dateLabel,
+  dayNumberLabel,
+  shortDayLabel,
+  todayDateString,
+  weekDays,
+} from '@/lib/dates'
 import { WorkoutSessionCard } from '@/components/workouts/workout-session-card'
 import { CopyPublicLinkButton } from '@/components/share/copy-public-link-button'
 
@@ -53,6 +60,40 @@ function Chip({
   )
 }
 
+function WeekDayChip({
+  date,
+  active,
+  count,
+}: {
+  date: string
+  active: boolean
+  count: number
+}) {
+  return (
+    <Link
+      href={dayHref(date)}
+      className={`grid min-w-0 place-items-center gap-1 rounded-xl border px-2 py-2 text-center transition-colors ${
+        active
+          ? 'border-highlight/50 bg-primary text-text-primary'
+          : 'border-white/10 bg-surface/50 text-text-muted hover:border-highlight/30 hover:text-text-secondary'
+      }`}
+    >
+      <span className="text-[10px] font-semibold uppercase">
+        {shortDayLabel(date)}
+      </span>
+      <span className="font-mono text-lg leading-none">
+        {dayNumberLabel(date)}
+      </span>
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          count > 0 ? 'bg-highlight' : 'bg-white/15'
+        }`}
+        aria-label={`${count} rutinas`}
+      />
+    </Link>
+  )
+}
+
 export default async function TodayPage({
   searchParams,
 }: {
@@ -62,7 +103,9 @@ export default async function TodayPage({
   const tomorrow = addDays(today, 1)
   const { date, detail } = await searchParams
   const selectedDate = date ?? today
+  const visibleWeekDays = weekDays(selectedDate)
   const sessions = await getSessionsForDate(selectedDate)
+  const sessionCounts = await getSessionCountsForDates(visibleWeekDays)
   const selectedExercise = sessions
     .flatMap((session) => session.exercises)
     .find((exercise) => exercise.id === detail)
@@ -79,6 +122,17 @@ export default async function TodayPage({
           {selectedDate}
         </p>
         <h1 className="text-2xl font-bold">{dateLabel(selectedDate)}</h1>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {visibleWeekDays.map((day) => (
+          <WeekDayChip
+            key={day}
+            date={day}
+            active={selectedDate === day}
+            count={sessionCounts.get(day) ?? 0}
+          />
+        ))}
       </div>
 
       <div className="flex gap-2">
@@ -100,7 +154,7 @@ export default async function TodayPage({
               No tienes una rutina para {selectedDate === today ? 'hoy' : 'este día'}.
             </p>
             <p className="text-sm text-text-muted">
-              Elige una plantilla y prográmala para hoy o mañana.
+              Elige una plantilla y prográmala para cualquier día de la semana.
             </p>
           </div>
           <Link
