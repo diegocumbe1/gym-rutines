@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Dumbbell, Search } from 'lucide-react'
+import { Dumbbell, Search } from 'lucide-react'
 import { listExercisesPage } from '@/lib/data/exercises'
+import { ExercisesPagination } from '@/components/exercises/exercises-pagination'
 import { getSignedMediaUrls } from '@/lib/supabase/storage'
 import { BODY_PARTS, bodyPartLabel } from '@/lib/exercises/labels'
 
@@ -39,44 +40,6 @@ function Chip({
   )
 }
 
-function PaginationLink({
-  href,
-  disabled,
-  direction,
-  children,
-}: {
-  href: string
-  disabled?: boolean
-  direction: 'prev' | 'next'
-  children: React.ReactNode
-}) {
-  const Icon = direction === 'prev' ? ChevronLeft : ChevronRight
-  const content = (
-    <>
-      {direction === 'prev' && <Icon size={17} strokeWidth={1.75} />}
-      {children}
-      {direction === 'next' && <Icon size={17} strokeWidth={1.75} />}
-    </>
-  )
-
-  if (disabled) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-lg border border-white/5 px-3 py-2 text-sm text-text-disabled">
-        {content}
-      </span>
-    )
-  }
-
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-highlight/30 hover:text-text-primary"
-    >
-      {content}
-    </Link>
-  )
-}
-
 export default async function ExercisesPage({
   searchParams,
 }: {
@@ -84,7 +47,7 @@ export default async function ExercisesPage({
 }) {
   const { q, part, page: pageParam } = await searchParams
   const page = Math.max(1, Number(pageParam) || 1)
-  const { exercises, total } = await listExercisesPage({
+  const { exercises, total, relaxed } = await listExercisesPage({
     search: q,
     bodyPart: part,
     page,
@@ -145,6 +108,13 @@ export default async function ExercisesPage({
         )}
       </div>
 
+      {relaxed && (
+        <p className="rounded-xl border border-white/10 bg-surface/60 px-3 py-2 text-xs text-text-muted">
+          No hay coincidencias exactas para «{q}». Mostramos ejercicios
+          similares.
+        </p>
+      )}
+
       {exercises.length === 0 ? (
         <div className="crystal-surface rounded-2xl p-6 text-center">
           <p className="text-text-secondary">No se encontraron ejercicios.</p>
@@ -194,27 +164,11 @@ export default async function ExercisesPage({
         </ul>
       )}
 
-      {totalPages > 1 && (
-        <nav
-          aria-label="Paginación de ejercicios"
-          className="flex items-center justify-between border-t border-white/5 pt-4"
-        >
-          <PaginationLink
-            href={buildHref(q, part, page - 1)}
-            direction="prev"
-            disabled={page <= 1}
-          >
-            Anterior
-          </PaginationLink>
-          <PaginationLink
-            href={buildHref(q, part, page + 1)}
-            direction="next"
-            disabled={page >= totalPages}
-          >
-            Siguiente
-          </PaginationLink>
-        </nav>
-      )}
+      <ExercisesPagination
+        page={page}
+        totalPages={totalPages}
+        buildHref={(target) => buildHref(q, part, target)}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Dumbbell } from 'lucide-react'
 import { bodyPartLabel } from '@/lib/exercises/labels'
 import {
   formatDuration,
@@ -67,24 +67,44 @@ export function PublicExerciseCard({
     <li className="crystal-surface overflow-hidden rounded-2xl">
       <details className="group">
         <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-4 transition-colors hover:bg-white/[0.02]">
-          <div className="min-w-0">
-            <p className="text-xs text-text-muted">
-              {index + 1} · {muscleLabel}
-            </p>
-            <p className="mt-1 font-medium capitalize">{name}</p>
-            <p className="mt-2 font-mono text-xs text-text-muted">
-              {trackingTypeLabel(trackingType)}
-              {usesSets
-                ? ` · ${targetSets ?? '—'} x ${targetRepsMin ?? '—'}-${targetRepsMax ?? '—'}`
-                : ''}
-              {tracksWeight(trackingType) && targetWeight
-                ? ` · sug. ${targetWeight} kg`
-                : ''}
-              {trackingType === 'duration'
-                ? ` · ${formatDuration(targetDurationSeconds) || 'sin tiempo'}`
-                : ''}
-              {restSeconds ? ` · ${restSeconds}s` : ''}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-2">
+              {exercise?.public_media_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={exercise.public_media_url}
+                  alt={name}
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <Dumbbell
+                  size={20}
+                  strokeWidth={1.5}
+                  className="text-text-disabled"
+                  aria-hidden="true"
+                />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-text-muted">
+                {index + 1} · {muscleLabel}
+              </p>
+              <p className="mt-1 font-medium capitalize">{name}</p>
+              <p className="mt-2 font-mono text-xs text-text-muted">
+                {trackingTypeLabel(trackingType)}
+                {usesSets
+                  ? ` · ${targetSets ?? '—'} x ${targetRepsMin ?? '—'}-${targetRepsMax ?? '—'}`
+                  : ''}
+                {tracksWeight(trackingType) && targetWeight
+                  ? ` · sug. ${targetWeight} kg`
+                  : ''}
+                {trackingType === 'duration'
+                  ? ` · ${formatDuration(targetDurationSeconds) || 'sin tiempo'}`
+                  : ''}
+                {restSeconds ? ` · ${restSeconds}s` : ''}
+              </p>
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-text-secondary">
             <span className="group-open:hidden">Detalle</span>

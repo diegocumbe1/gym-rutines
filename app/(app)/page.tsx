@@ -14,7 +14,7 @@ import {
   refreshSessionFromTemplate,
 } from '@/app/actions/sessions'
 import { getSessionCountsForDates, getSessionsForDate } from '@/lib/data/sessions'
-import { getSignedMediaUrl } from '@/lib/supabase/storage'
+import { getSignedMediaUrl, getSignedMediaUrls } from '@/lib/supabase/storage'
 import {
   addDays,
   dateLabel,
@@ -115,6 +115,26 @@ export default async function TodayPage({
       )
     : null
 
+  // Miniatura de cada ejercicio de la sesión: se ve la imagen sin tener que
+  // abrir el detalle.
+  const sessionExercises = sessions.flatMap((session) => session.exercises)
+  const signedThumbs = await getSignedMediaUrls([
+    ...new Set(
+      sessionExercises
+        .map(
+          (exercise) => exercise.exercise?.image_url ?? exercise.exercise?.gif_url
+        )
+        .filter((path): path is string => Boolean(path))
+    ),
+  ])
+  const exerciseMedia = Object.fromEntries(
+    sessionExercises.flatMap((exercise) => {
+      const path = exercise.exercise?.image_url ?? exercise.exercise?.gif_url
+      const url = path ? signedThumbs.get(path) : undefined
+      return url ? [[exercise.id, url] as const] : []
+    })
+  )
+
   return (
     <div className="space-y-6">
       <div className="space-y-1">
@@ -173,6 +193,7 @@ export default async function TodayPage({
                 selectedDate={selectedDate}
                 detailId={detail}
                 selectedMedia={selectedMedia}
+                exerciseMedia={exerciseMedia}
               />
 
               <div className="grid gap-2 rounded-2xl border border-white/5 bg-surface/50 p-3">

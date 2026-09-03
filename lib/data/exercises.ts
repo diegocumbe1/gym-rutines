@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import { buildSearchPlan } from '@/lib/exercises/search'
 
 export type ExerciseListItem = {
   id: string
@@ -26,141 +27,16 @@ export type SimilarExercise = ExerciseListItem & {
 const LIST_COLUMNS =
   'id,name,body_part,muscle_group,equipment,target,image_url'
 
-const SEARCH_ALIASES: Array<[string[], string[]]> = [
-  [
-    ['press plano', 'press de banca', 'press banca', 'banca plana'],
-    ['bench press', 'chest press'],
-  ],
-  [
-    ['press inclinado', 'banca inclinada', 'inclinado'],
-    ['incline bench press', 'incline chest press'],
-  ],
-  [
-    ['press declinado', 'press deplicano', 'banca declinada', 'declinado'],
-    ['decline bench press', 'decline chest press'],
-  ],
-  [
-    ['peck deck', 'pec deck', 'peck-deck', 'pec-deck', 'aperturas maquina'],
-    ['lever seated fly', 'butterfly', 'seated fly'],
-  ],
-  [
-    ['maquina', 'máquina', 'maquinas', 'máquinas'],
-    ['leverage machine', 'smith machine', 'sled machine', 'cable'],
-  ],
-  [
-    ['prensa', 'prensa de pierna', 'prensa piernas', 'prensa 45'],
-    ['leg press', 'sled 45', 'sled machine', 'lever alternate leg press'],
-  ],
-  [
-    ['extension pierna', 'extensión pierna', 'extension de pierna', 'extensión de pierna', 'cuadriceps maquina'],
-    ['leg extension', 'lever leg extension'],
-  ],
-  [
-    ['curl femoral', 'femoral sentado', 'femoral acostado', 'curl pierna', 'curl de pierna'],
-    ['leg curl', 'lever seated leg curl', 'lever lying leg curl', 'kneeling leg curl'],
-  ],
-  [
-    ['abductora', 'abduccion cadera', 'abducción cadera', 'abduccion de cadera'],
-    ['hip abduction', 'lever seated hip abduction', 'abductors'],
-  ],
-  [
-    ['aductora', 'aduccion cadera', 'aducción cadera', 'aduccion de cadera'],
-    ['hip adduction', 'lever seated hip adduction', 'adductors'],
-  ],
-  [
-    ['sentadilla hack', 'hack squat', 'hack'],
-    ['hack squat', 'sled hack squat', 'smith hack squat'],
-  ],
-  [
-    ['smith', 'multipower'],
-    ['smith machine', 'smith squat', 'smith leg press'],
-  ],
-  [
-    ['pantorrilla maquina', 'gemelo maquina', 'calf maquina', 'calf raise'],
-    ['calf raise', 'calf press', 'calves'],
-  ],
-  [['pecho', 'pectorales'], ['chest', 'pectorals']],
-  [['espalda'], ['back', 'lats', 'upper back']],
-  [['pierna', 'piernas'], ['upper legs', 'quads', 'hamstrings', 'glutes']],
-  [['hombro', 'hombros'], ['shoulders', 'delts']],
-  [['brazo', 'brazos'], ['upper arms', 'biceps', 'triceps']],
-]
-
-const BODY_PART_SEARCH_ALIASES: Record<string, string> = {
-  back: 'back',
-  espalda: 'back',
-  cardio: 'cardio',
-  chest: 'chest',
-  pecho: 'chest',
-  pectoral: 'chest',
-  pectorales: 'chest',
-  shoulders: 'shoulders',
-  hombro: 'shoulders',
-  hombros: 'shoulders',
-  arms: 'upper arms',
-  brazo: 'upper arms',
-  brazos: 'upper arms',
-  biceps: 'upper arms',
-  triceps: 'upper arms',
-  legs: 'upper legs',
-  pierna: 'upper legs',
-  piernas: 'upper legs',
-  quads: 'upper legs',
-  cuadriceps: 'upper legs',
-  hamstrings: 'upper legs',
-  glutes: 'upper legs',
-  gluteos: 'upper legs',
-  calves: 'lower legs',
-  pantorrilla: 'lower legs',
-  pantorrillas: 'lower legs',
-  forearms: 'lower arms',
-  antebrazo: 'lower arms',
-  antebrazos: 'lower arms',
-  core: 'waist',
-  abs: 'waist',
-  abdomen: 'waist',
-  waist: 'waist',
-  cuello: 'neck',
-  neck: 'neck',
-}
-
-function normalizeSearch(value: string) {
-  return value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .trim()
-}
-
-export function bodyPartFromSearch(search: string | null | undefined) {
-  if (!search) return undefined
-  return BODY_PART_SEARCH_ALIASES[normalizeSearch(search)]
-}
-
-function escapeSearchTerm(term: string) {
-  return term.replaceAll('%', '').replaceAll(',', ' ').trim()
-}
-
-function expandSearchTerms(search: string) {
-  const normalized = normalizeSearch(search)
-  const terms = new Set([search])
-
-  for (const [aliases, expansions] of SEARCH_ALIASES) {
-    const matches = aliases.some((alias) => {
-      const normalizedAlias = alias
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/\p{Diacritic}/gu, '')
-      return normalized.includes(normalizedAlias)
-    })
-
-    if (matches) {
-      expansions.forEach((term) => terms.add(term))
-    }
-  }
-
-  return Array.from(terms).map(escapeSearchTerm).filter(Boolean)
-}
+// El texto se busca primero solo en el nombre (es lo que se espera al escribir
+// en el buscador) y solo si no hay nada se amplía al resto de campos.
+const NAME_COLUMNS = ['name'] as const
+const SEARCH_COLUMNS = [
+  'name',
+  'equipment',
+  'body_part',
+  'muscle_group',
+  'target',
+] as const
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? '')
@@ -234,34 +110,74 @@ function similarityScore(source: ExerciseDetail, candidate: ExerciseListItem) {
   return score
 }
 
-export async function listExercises(opts?: {
-  search?: string
+/** OR de `término x columna` para un grupo de sinónimos. */
+function orFilterFor(terms: string[], columns: readonly string[]) {
+  return terms
+    .flatMap((term) => columns.map((column) => `${column}.ilike.%${term}%`))
+    .join(',')
+}
+
+/**
+ * PostgREST responde 416 (`PGRST103`) cuando el rango pedido empieza más allá
+ * del total de filas: pasa al cambiar de página con menos resultados de los
+ * que había antes. No es un fallo, es una página vacía.
+ */
+function isRangeError(error: { code?: string; message?: string }) {
+  return (
+    error.code === 'PGRST103' ||
+    /range not satisfiable/i.test(error.message ?? '')
+  )
+}
+
+async function runExercisesQuery(opts: {
+  groups: string[][]
+  columns?: readonly string[]
+  namePhrase?: string
   bodyPart?: string
-  limit?: number
-}): Promise<ExerciseListItem[]> {
+  from: number
+  to: number
+}) {
   const supabase = await createClient()
-  let query = supabase
-    .from('exercises')
-    .select(LIST_COLUMNS)
-    .order('name', { ascending: true })
-    .limit(opts?.limit ?? 60)
+  const columns = opts.columns ?? SEARCH_COLUMNS
 
-  if (opts?.search) {
-    const terms = expandSearchTerms(opts.search)
-    const filters = terms.flatMap((term) => [
-      `name.ilike.%${term}%`,
-      `equipment.ilike.%${term}%`,
-      `body_part.ilike.%${term}%`,
-      `muscle_group.ilike.%${term}%`,
-      `target.ilike.%${term}%`,
-    ])
-    query = query.or(filters.join(','))
+  const build = (head: boolean) => {
+    let query = supabase
+      .from('exercises')
+      .select(LIST_COLUMNS, { count: 'exact', head })
+      .order('name', { ascending: true })
+
+    if (opts.namePhrase) query = query.ilike('name', `%${opts.namePhrase}%`)
+
+    // Cada `.or()` encadenado se combina con AND: todas las palabras buscadas
+    // deben aparecer, cada una en alguna de las columnas.
+    for (const group of opts.groups) {
+      query = query.or(orFilterFor(group, columns))
+    }
+    if (opts.bodyPart) query = query.eq('body_part', opts.bodyPart)
+
+    return query
   }
-  if (opts?.bodyPart) query = query.eq('body_part', opts.bodyPart)
 
-  const { data, error } = await query
-  if (error) throw new Error(error.message)
-  return data ?? []
+  const { data, error, count } = await build(false).range(opts.from, opts.to)
+
+  if (error) {
+    if (!isRangeError(error)) throw new Error(error.message)
+
+    // Página fuera de rango: se devuelve vacía con el total real para que la
+    // vista pueda redirigir a la última página existente.
+    const { count: total, error: countError } = await build(true)
+    if (countError) throw new Error(countError.message)
+    return { exercises: [] as ExerciseListItem[], total: total ?? 0 }
+  }
+
+  return { exercises: (data ?? []) as ExerciseListItem[], total: count ?? 0 }
+}
+
+export type ExercisesPage = {
+  exercises: ExerciseListItem[]
+  total: number
+  /** true si no hubo coincidencia exacta y se muestran resultados similares. */
+  relaxed: boolean
 }
 
 export async function listExercisesPage(opts?: {
@@ -269,39 +185,66 @@ export async function listExercisesPage(opts?: {
   bodyPart?: string
   page?: number
   pageSize?: number
-}): Promise<{ exercises: ExerciseListItem[]; total: number }> {
+}): Promise<ExercisesPage> {
   const page = Math.max(1, opts?.page ?? 1)
   const pageSize = opts?.pageSize ?? 60
   const from = (page - 1) * pageSize
   const to = from + pageSize - 1
+  const bodyPart = opts?.bodyPart
 
-  const supabase = await createClient()
-  let query = supabase
-    .from('exercises')
-    .select(LIST_COLUMNS, { count: 'exact' })
-    .order('name', { ascending: true })
-    .range(from, to)
+  const plan = opts?.search ? buildSearchPlan(opts.search) : null
 
-  if (opts?.search) {
-    const terms = expandSearchTerms(opts.search)
-    const filters = terms.flatMap((term) => [
-      `name.ilike.%${term}%`,
-      `equipment.ilike.%${term}%`,
-      `body_part.ilike.%${term}%`,
-      `muscle_group.ilike.%${term}%`,
-      `target.ilike.%${term}%`,
-    ])
-    query = query.or(filters.join(','))
+  if (!plan) {
+    const result = await runExercisesQuery({ groups: [], bodyPart, from, to })
+    return { ...result, relaxed: false }
   }
-  if (opts?.bodyPart) query = query.eq('body_part', opts.bodyPart)
 
-  const { data, error, count } = await query
-  if (error) throw new Error(error.message)
-
-  return {
-    exercises: data ?? [],
-    total: count ?? 0,
+  // 1. El nombre contiene lo escrito tal cual, en el mismo orden. Es la
+  //    coincidencia más fuerte: si existe, no se muestra nada más.
+  if (plan.groups.length > 1) {
+    const byPhrase = await runExercisesQuery({
+      groups: [],
+      namePhrase: plan.phrase,
+      bodyPart,
+      from,
+      to,
+    })
+    if (byPhrase.total > 0) return { ...byPhrase, relaxed: false }
   }
+
+  // 2. Todas las palabras en el nombre, en cualquier orden. Al ordenar
+  //    alfabéticamente, el nombre que coincide justo con lo escrito queda
+  //    antes que los que lo amplían ("Barbell Squat" antes que "Barbell Squat
+  //    Jump").
+  const byName = await runExercisesQuery({
+    groups: plan.groups,
+    columns: NAME_COLUMNS,
+    bodyPart,
+    from,
+    to,
+  })
+  if (byName.total > 0) return { ...byName, relaxed: false }
+
+  // 3. Todas las palabras, pero repartidas entre nombre, equipo, zona o músculo.
+  const byFields = await runExercisesQuery({
+    groups: plan.groups,
+    bodyPart,
+    from,
+    to,
+  })
+  if (byFields.total > 0 || plan.groups.length === 1) {
+    return { ...byFields, relaxed: false }
+  }
+
+  // 4. Sin coincidencia con todas las palabras: ejercicios similares
+  //    (cualquiera de los términos).
+  const relaxed = await runExercisesQuery({
+    groups: [plan.terms],
+    bodyPart,
+    from,
+    to,
+  })
+  return { ...relaxed, relaxed: relaxed.total > 0 }
 }
 
 export async function getExercise(id: string): Promise<ExerciseDetail | null> {

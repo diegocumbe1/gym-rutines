@@ -3,6 +3,7 @@ import { getPublicTemplate } from '@/lib/data/public-share'
 import { bodyPartLabel } from '@/lib/exercises/labels'
 import { BrandMark } from '@/components/brand/brand-mark'
 import { PublicExerciseCard } from '@/components/share/public-exercise-card'
+import { SessionTimer } from '@/components/workouts/session-timer'
 
 export default async function PublicTemplatePage({
   params,
@@ -31,6 +32,11 @@ export default async function PublicTemplatePage({
             {template.exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
           </p>
         </div>
+
+        <SessionTimer
+          timerId={`public-template-${shareId}`}
+          className="sticky top-3 z-20"
+        />
 
         <ol className="space-y-3">
           {template.exercises.map((item, index) => (

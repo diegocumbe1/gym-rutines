@@ -3,6 +3,7 @@ import { getPublicSession } from '@/lib/data/public-share'
 import { dateLabel } from '@/lib/dates'
 import { BrandMark } from '@/components/brand/brand-mark'
 import { PublicExerciseCard } from '@/components/share/public-exercise-card'
+import { SessionTimer } from '@/components/workouts/session-timer'
 
 export default async function PublicSessionPage({
   params,
@@ -33,6 +34,11 @@ export default async function PublicSessionPage({
             {session.exercises.length === 1 ? 'ejercicio' : 'ejercicios'}
           </p>
         </div>
+
+        <SessionTimer
+          timerId={`public-session-${shareId}`}
+          className="sticky top-3 z-20"
+        />
 
         <ol className="space-y-3">
           {session.exercises.map((item, index) => (

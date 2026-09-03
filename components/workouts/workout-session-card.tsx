@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -9,10 +9,8 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  Clock3,
-  Pause,
+  Dumbbell,
   Play,
-  RotateCcw,
   X,
 } from 'lucide-react'
 import {
@@ -23,6 +21,8 @@ import {
   startWorkoutSession,
 } from '@/app/actions/sessions'
 import type { SessionExercise, WorkoutSession, WorkoutSet } from '@/lib/data/sessions'
+import { SessionTimerPanel } from '@/components/workouts/session-timer-panel'
+import { useSessionTimer } from '@/components/workouts/use-session-timer'
 import { todayDateString } from '@/lib/dates'
 import {
   formatDuration,
@@ -40,16 +40,6 @@ function dayHref(date: string, detailId?: string) {
   const qs = params.toString()
   const path = qs ? `/?${qs}` : '/'
   return detailId ? `${path}#session-exercise-${detailId}` : path
-}
-
-function formatClock(seconds: number) {
-  const hours = Math.floor(seconds / 3600)
-  const mins = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-  if (hours > 0) {
-    return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  }
-  return `${mins}:${String(secs).padStart(2, '0')}`
 }
 
 function elapsedBetween(startedAt: string | null, completedAt: string | null) {
@@ -123,21 +113,31 @@ export function WorkoutSessionCard({
   selectedDate,
   detailId,
   selectedMedia,
+  exerciseMedia,
 }: {
   session: WorkoutSession
   selectedDate: string
   detailId?: string
   selectedMedia: string | null
+  /** Miniatura por ejercicio de la sesión (id -> URL firmada). */
+  exerciseMedia: Record<string, string>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [now, setNow] = useState(() => Date.now())
-  const [timerBaseSeconds, setTimerBaseSeconds] = useState(() =>
-    session.status === 'completed'
+  const sessionCompleted = session.status === 'completed'
+  const {
+    elapsed: sessionElapsed,
+    running: timerRunning,
+    start: startTimer,
+    pause: pauseTimer,
+    reset: resetTimer,
+    clear: clearTimer,
+  } = useSessionTimer({
+    sessionId: session.id,
+    initialSeconds: sessionCompleted
       ? elapsedBetween(session.started_at, session.completed_at)
-      : 0
-  )
-  const [timerStartedAt, setTimerStartedAt] = useState<number | null>(null)
+      : 0,
+  })
   const [expandedCompleted, setExpandedCompleted] = useState<
     Record<string, boolean>
   >({})
@@ -198,19 +198,6 @@ export function WorkoutSessionCard({
         ])
       )
   )
-
-  const timerRunning = timerStartedAt !== null
-  const sessionElapsed = timerStartedAt
-    ? timerBaseSeconds + Math.floor((now - timerStartedAt) / 1000)
-    : timerBaseSeconds
-
-  useEffect(() => {
-    if (!hasStarted || !timerRunning) return
-    const id = window.setInterval(() => {
-      setNow(Date.now())
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [hasStarted, timerRunning])
 
   function updateDraft(setId: string, patch: Partial<SetDraft>) {
     setDrafts((current) => ({
@@ -294,6 +281,8 @@ export function WorkoutSessionCard({
     data.set('id', session.id)
     startTransition(async () => {
       await completeWorkoutSession(data)
+      // El tiempo definitivo pasa a calcularse desde la sesión guardada.
+      clearTimer()
       router.refresh()
     })
   }
@@ -315,24 +304,6 @@ export function WorkoutSessionCard({
       await moveSessionExercise(data)
       router.refresh()
     })
-  }
-
-  function startTimer() {
-    if (timerRunning) return
-    const start = Date.now()
-    setNow(start)
-    setTimerStartedAt(start)
-  }
-
-  function pauseTimer() {
-    if (!timerStartedAt) return
-    setTimerBaseSeconds(sessionElapsed)
-    setTimerStartedAt(null)
-  }
-
-  function resetTimer() {
-    setTimerBaseSeconds(0)
-    setTimerStartedAt(null)
   }
 
   function toggleCompletedExercise(exerciseId: string) {
@@ -389,61 +360,26 @@ export function WorkoutSessionCard({
       </div>
 
       {hasStarted && (
-        <div className="sticky top-[72px] z-20 mt-4 rounded-2xl border border-highlight/30 bg-surface-2/95 p-3 shadow-[0_0_30px_rgba(49,93,168,0.14)] backdrop-blur-xl">
-          <div className="flex flex-col gap-3">
-            <div>
-              <p className="flex items-center gap-1 text-xs uppercase text-text-muted">
-                <Clock3 size={14} strokeWidth={1.75} /> Tiempo total
-              </p>
-              <p className="mt-1 font-mono text-3xl font-semibold text-text-primary">
-                {formatClock(sessionElapsed)}
-              </p>
-            </div>
-            <div
-              className={`grid gap-2 ${
-                session.status === 'completed' ? 'grid-cols-3' : 'grid-cols-4'
-              }`}
+        <SessionTimerPanel
+          elapsed={sessionElapsed}
+          running={timerRunning}
+          onStart={startTimer}
+          onPause={pauseTimer}
+          onReset={resetTimer}
+          className="sticky top-[72px] z-20 mt-4"
+        >
+          {!sessionCompleted && (
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={finishSession}
+              className="flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-primary hover:text-text-primary disabled:opacity-60"
             >
-                <button
-                  type="button"
-                  disabled={timerRunning}
-                  onClick={startTimer}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-highlight/30 bg-primary px-2 py-2 text-xs font-semibold text-text-primary transition-colors hover:bg-primary-hover disabled:opacity-40"
-                >
-                  <Play size={15} strokeWidth={1.75} />
-                  Iniciar
-                </button>
-                <button
-                  type="button"
-                  disabled={!timerRunning}
-                  onClick={pauseTimer}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary disabled:opacity-40"
-                >
-                  <Pause size={15} strokeWidth={1.75} />
-                  Pausar
-                </button>
-                <button
-                  type="button"
-                  onClick={resetTimer}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-surface-3 hover:text-text-primary"
-                >
-                  <RotateCcw size={15} strokeWidth={1.75} />
-                  Reiniciar
-                </button>
-              {session.status !== 'completed' && (
-                <button
-                  type="button"
-                  disabled={isPending}
-                onClick={finishSession}
-                  className="flex items-center justify-center gap-1 rounded-lg border border-white/10 px-2 py-2 text-xs font-semibold text-text-secondary transition-colors hover:bg-primary hover:text-text-primary disabled:opacity-60"
-              >
-                  <CheckCircle2 size={15} strokeWidth={1.75} />
-                  Finalizar
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+              <CheckCircle2 size={15} strokeWidth={1.75} />
+              Finalizar
+            </button>
+          )}
+        </SessionTimerPanel>
       )}
 
       <ol className="mt-4 space-y-2">
@@ -479,17 +415,37 @@ export function WorkoutSessionCard({
                   scroll={detailId !== exercise.id}
                   className="flex min-w-0 items-start justify-between gap-3 p-3 transition-colors hover:bg-white/[0.02]"
                 >
-                  <div className="min-w-0">
-                    <p className="text-xs text-text-muted">
-                      {index + 1} · {exercise.muscle_group ?? '-'} ·{' '}
-                      {trackingTypeLabel(exercise.tracking_type)}
-                    </p>
-                    <p className="line-clamp-1 font-medium capitalize">
-                      {exercise.exercise_name}
-                    </p>
-                    <p className="mt-1 font-mono text-xs text-text-muted">
-                      {exerciseSummary(exercise, done, total)}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-2">
+                      {exerciseMedia[exercise.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={exerciseMedia[exercise.id]}
+                          alt={exercise.exercise_name}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Dumbbell
+                          size={18}
+                          strokeWidth={1.5}
+                          className="text-text-disabled"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-text-muted">
+                        {index + 1} · {exercise.muscle_group ?? '-'} ·{' '}
+                        {trackingTypeLabel(exercise.tracking_type)}
+                      </p>
+                      <p className="line-clamp-2 font-medium capitalize">
+                        {exercise.exercise_name}
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-text-muted">
+                        {exerciseSummary(exercise, done, total)}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-semibold text-text-secondary">
                     {detailId === exercise.id ? (

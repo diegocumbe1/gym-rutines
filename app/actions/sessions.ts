@@ -52,7 +52,36 @@ function validDateOrNull(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 }
 
-async function scheduleTemplateSessionForDate(formData: FormData, scheduledDate: string) {
+type SessionExerciseRow = {
+  user_id: string
+  session_id: string
+  exercise_id: string | null
+  position: number
+  exercise_name: string
+  muscle_group: string | null
+  tracking_type: TrackingType
+  target_sets: number | null
+  target_reps_min: number | null
+  target_reps_max: number | null
+  target_weight: number | null
+  target_duration_seconds: number | null
+  rest_seconds: number | null
+  notes: string | null
+}
+
+type SchedulingPlan = {
+  userId: string
+  templateId: string
+  templateName: string
+  /** Snapshot de los ejercicios elegidos, listo para una sesión concreta. */
+  buildExerciseRows: (sessionId: string) => SessionExerciseRow[]
+}
+
+/**
+ * Lee la plantilla y los ajustes del formulario una sola vez, para poder
+ * programarla en una fecha o en varias sin repetir la consulta.
+ */
+async function loadSchedulingPlan(formData: FormData): Promise<SchedulingPlan> {
   const { userId } = await verifySession()
   const templateId = stringValue(formData, 'template_id')
   const selectedIds = new Set(
@@ -100,23 +129,8 @@ async function scheduleTemplateSessionForDate(formData: FormData, scheduledDate:
     redirect(`/templates/${templateId}`)
   }
 
-  const { data: session, error: sessionError } = await supabase
-    .from('workout_sessions')
-    .insert({
-      user_id: userId,
-      template_id: templateId,
-      title: template.name,
-      scheduled_date: scheduledDate,
-      status: 'planned',
-    })
-    .select('id')
-    .single()
-
-  if (sessionError || !session) {
-    throw new Error(sessionError?.message ?? 'No se pudo programar la rutina.')
-  }
-
-  const rows = exercises.map((item, index) => {
+  const buildExerciseRows = (sessionId: string): SessionExerciseRow[] =>
+    exercises.map((item, index) => {
     const formTrackingType = stringValue(formData, `tracking_type_${item.id}`)
     const type = isTrackingType(formTrackingType)
       ? formTrackingType
@@ -124,7 +138,7 @@ async function scheduleTemplateSessionForDate(formData: FormData, scheduledDate:
 
     return {
       user_id: userId,
-      session_id: session.id,
+      session_id: sessionId,
       exercise_id: item.exercise?.id ?? null,
       position: index,
       exercise_name: item.notes?.trim() || item.exercise?.name || 'Ejercicio',
@@ -167,11 +181,51 @@ async function scheduleTemplateSessionForDate(formData: FormData, scheduledDate:
     }
   })
 
+  return {
+    userId,
+    templateId,
+    templateName: template.name,
+    buildExerciseRows,
+  }
+}
+
+/** Crea una sesión planificada por cada fecha, copiando los ejercicios. */
+async function createSessionsForDates(
+  plan: SchedulingPlan,
+  scheduledDates: string[]
+) {
+  const supabase = await createClient()
+  const { data: sessions, error: sessionError } = await supabase
+    .from('workout_sessions')
+    .insert(
+      scheduledDates.map((scheduledDate) => ({
+        user_id: plan.userId,
+        template_id: plan.templateId,
+        title: plan.templateName,
+        scheduled_date: scheduledDate,
+        status: 'planned',
+      }))
+    )
+    .select('id')
+
+  if (sessionError || !sessions || sessions.length === 0) {
+    throw new Error(sessionError?.message ?? 'No se pudo programar la rutina.')
+  }
+
+  const rows = sessions.flatMap((session) => plan.buildExerciseRows(session.id))
   const { error: exercisesError } = await supabase
     .from('session_exercises')
     .insert(rows)
 
   if (exercisesError) throw new Error(exercisesError.message)
+}
+
+async function scheduleTemplateSessionForDate(
+  formData: FormData,
+  scheduledDate: string
+) {
+  const plan = await loadSchedulingPlan(formData)
+  await createSessionsForDates(plan, [scheduledDate])
 
   revalidatePath('/')
   redirect(scheduledDate === todayDateString() ? '/' : `/?date=${scheduledDate}`)
@@ -196,6 +250,36 @@ export async function scheduleTemplateSessionOnDate(formData: FormData) {
   }
 
   await scheduleTemplateSessionForDate(formData, scheduledDate)
+}
+
+/**
+ * Programa la plantilla en todos los días marcados en el calendario: el plan
+ * semanal o mensual se crea de una sola vez.
+ */
+export async function scheduleTemplateSessionOnDates(formData: FormData) {
+  const templateId = stringValue(formData, 'template_id')
+  const month = stringValue(formData, 'calendar_month').trim()
+  const backToCalendar = `/templates/${templateId}${
+    /^\d{4}-\d{2}$/.test(month) ? `?month=${month}` : ''
+  }`
+
+  const scheduledDates = [
+    ...new Set(
+      formValues(formData, 'scheduled_dates')
+        .map((value) => validDateOrNull(String(value).trim()))
+        .filter((value): value is string => Boolean(value))
+    ),
+  ].sort()
+
+  if (scheduledDates.length === 0) {
+    redirect(backToCalendar)
+  }
+
+  const plan = await loadSchedulingPlan(formData)
+  await createSessionsForDates(plan, scheduledDates)
+
+  revalidatePath('/')
+  redirect(`/?date=${scheduledDates[0]}`)
 }
 
 export async function enableSessionPublicShare(formData: FormData) {

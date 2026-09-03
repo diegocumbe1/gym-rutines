@@ -27,9 +27,16 @@ import {
   scheduleTemplateSessionTomorrow,
 } from '@/app/actions/sessions'
 import { bodyPartLabel } from '@/lib/exercises/labels'
-import { todayDateString } from '@/lib/dates'
+import {
+  isMonthKey,
+  monthGridDays,
+  monthOf,
+  todayDateString,
+} from '@/lib/dates'
+import { getSessionCountsForDates } from '@/lib/data/sessions'
 import { getSignedMediaUrls } from '@/lib/supabase/storage'
 import { CopyPublicLinkButton } from '@/components/share/copy-public-link-button'
+import { PlanCalendar } from '@/components/templates/plan-calendar'
 import {
   TRACKING_TYPES,
   formatDuration,
@@ -309,13 +316,19 @@ function recommendation(count: number) {
 
 export default async function TemplateDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ month?: string }>
 }) {
   const { id } = await params
+  const { month: monthParam } = await searchParams
   const template = await getTemplate(id)
   if (!template) notFound()
   const today = todayDateString()
+  const month =
+    monthParam && isMonthKey(monthParam) ? monthParam : monthOf(today)
+  const sessionCounts = await getSessionCountsForDates(monthGridDays(month))
   const mediaPaths = template.exercises
     .map((te) => te.exercise?.gif_url ?? te.exercise?.image_url)
     .filter((path): path is string => Boolean(path))
@@ -446,6 +459,13 @@ export default async function TemplateDetailPage({
               <CalendarPlus size={17} strokeWidth={1.75} /> Programar
             </button>
           </div>
+
+          <PlanCalendar
+            templateId={template.id}
+            month={month}
+            today={today}
+            sessionCounts={sessionCounts}
+          />
           <ol className="space-y-3">
             {template.exercises.map((te, i) => (
               <ExerciseRow
