@@ -60,6 +60,14 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* Columna móvil centrada en escritorio; `data-wide` usa todo el ancho. */
+@media (min-width: 64rem) {
+  .app-main > :not([data-wide]) {
+    max-width: 25.5rem;
+    margin-inline: auto;
+  }
+}
+
 /* Materiales crystal — usar con moderación. */
 .crystal-surface {
   background: rgba(20, 33, 61, 0.18);

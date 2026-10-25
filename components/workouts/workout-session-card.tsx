@@ -150,7 +150,11 @@ export function WorkoutSessionCard({
   )
   const sets = useMemo(() => Object.values(setsByExercise).flat(), [setsByExercise])
   const persistedSets = sets.filter((set) => !set.id.startsWith('pending-'))
-  const hasStarted = session.status !== 'planned' || persistedSets.length > 0
+  const sessionCancelled = session.status === 'cancelled'
+  // Una sesión cancelada (p. ej. cerrada sola sin nada registrado) se retoma
+  // como si no se hubiera iniciado.
+  const hasStarted =
+    !sessionCancelled && (session.status !== 'planned' || persistedSets.length > 0)
 
   const progressUnits = session.exercises.reduce(
     (acc, exercise) => {
@@ -324,7 +328,9 @@ export function WorkoutSessionCard({
                 ? 'En progreso'
                 : session.status === 'completed'
                   ? 'Completada'
-                  : session.status}
+                  : sessionCancelled
+                    ? 'Cancelada'
+                    : session.status}
           </p>
           <h2 className="mt-1 text-lg font-bold capitalize">{session.title}</h2>
           <p className="text-sm text-text-muted">
@@ -342,7 +348,7 @@ export function WorkoutSessionCard({
             className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-text-primary transition-colors hover:bg-primary-hover disabled:opacity-60"
           >
             <Play size={16} strokeWidth={1.75} />
-            Iniciar
+            {sessionCancelled ? 'Retomar' : 'Iniciar'}
           </button>
         ) : (
           <div className="rounded-xl border border-white/10 px-3 py-2 text-right">

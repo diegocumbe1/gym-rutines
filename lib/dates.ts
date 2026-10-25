@@ -109,6 +109,11 @@ export function weekRangeLabel(weekStart: string) {
     : `${startDay} de ${startMonth} – ${endDay} de ${endMonth}`
 }
 
+/** Inicio de semana abreviado para tablas: "19 oct". */
+export function weekShortLabel(weekStart: string) {
+  return `${dayNumberLabel(weekStart)} ${monthNameLabel(weekStart).slice(0, 3)}`
+}
+
 function monthNameLabel(dateString: string) {
   const [year, month, day] = dateString.split('-').map(Number)
   const date = new Date(Date.UTC(year, month - 1, day, 12))

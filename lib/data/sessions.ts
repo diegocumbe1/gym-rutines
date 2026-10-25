@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { verifySession } from '@/lib/dal'
 import { tracksSets, type TrackingType } from '@/lib/workouts/tracking'
@@ -64,9 +65,71 @@ export type WorkoutSession = {
   exercises: SessionExercise[]
 }
 
+// Una sesión empezada que lleva más de esto sin terminarse se cierra sola.
+const STALE_SESSION_MS = 24 * 60 * 60 * 1000
+
+type StaleSessionRow = {
+  id: string
+  session_exercises:
+    | Array<{
+        is_completed: boolean | null
+        completed_at: string | null
+        workout_sets: Array<{ is_completed: boolean; completed_at: string | null }> | null
+      }>
+    | null
+}
+
+/**
+ * Cierra las sesiones `in_progress` iniciadas hace más de 24 h con lo que se
+ * registró: si hay algo completado queda `completed` (terminada a la hora de
+ * lo último marcado); si no hay nada, `cancelled`. Una vez por petición.
+ */
+export const closeStaleSessions = cache(async () => {
+  const { userId } = await verifySession()
+  const cutoff = new Date(Date.now() - STALE_SESSION_MS).toISOString()
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('workout_sessions')
+    .select(
+      'id,session_exercises(is_completed,completed_at,workout_sets(is_completed,completed_at))'
+    )
+    .eq('user_id', userId)
+    .eq('status', 'in_progress')
+    .lt('started_at', cutoff)
+
+  if (error) throw new Error(error.message)
+
+  for (const session of (data ?? []) as unknown as StaleSessionRow[]) {
+    const doneAt = (session.session_exercises ?? []).flatMap((exercise) => [
+      ...(exercise.is_completed && exercise.completed_at ? [exercise.completed_at] : []),
+      ...(exercise.workout_sets ?? []).flatMap((set) =>
+        set.is_completed && set.completed_at ? [set.completed_at] : []
+      ),
+    ])
+    const lastDone = doneAt.sort().at(-1)
+
+    const { error: updateError } = await supabase
+      .from('workout_sessions')
+      .update(
+        lastDone
+          ? { status: 'completed', completed_at: lastDone }
+          : { status: 'cancelled' }
+      )
+      .eq('id', session.id)
+      .eq('user_id', userId)
+      // Por si se terminó a mano entre la lectura y la escritura.
+      .eq('status', 'in_progress')
+
+    if (updateError) throw new Error(updateError.message)
+  }
+})
+
 export async function getSessionsForDate(
   scheduledDate: string
 ): Promise<WorkoutSession[]> {
+  await closeStaleSessions()
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('workout_sessions')
@@ -127,14 +190,29 @@ export type SessionHistoryItem = {
    *  propio ejercicio en los de tiempo o de una sola vez. */
   units_done: number
   units_total: number
-  /** Volumen movido (kg x reps) de las series completadas con peso. */
-  volume_kg: number
   duration_seconds: number | null
+  /** Ejercicios con sus series efectivas completadas, para las estadísticas
+   *  por zona y por ejercicio. */
+  exercises: HistoryExercise[]
+}
+
+export type HistoryExercise = {
+  /** `exercise_id` si sigue en el catálogo; si no, el nombre del snapshot. */
+  key: string
+  name: string
+  body_part: string | null
+  /** Músculo principal según el catálogo. */
+  target: string | null
+  tracking_type: TrackingType
+  /** Series completadas que no son de calentamiento. */
+  sets: Array<{ weight: number | null; reps: number | null }>
 }
 
 const HISTORY_SELECT =
   'id,title,scheduled_date,status,started_at,completed_at,' +
-  'session_exercises(id,tracking_type,is_completed,workout_sets(is_completed,actual_reps,actual_weight))'
+  'session_exercises(id,exercise_id,exercise_name,tracking_type,is_completed,' +
+  'workout_sets(is_completed,is_warmup,actual_reps,actual_weight),' +
+  'exercise:exercises(body_part,target))'
 
 type HistoryRow = {
   id: string
@@ -146,15 +224,19 @@ type HistoryRow = {
   session_exercises:
     | Array<{
         id: string
+        exercise_id: string | null
+        exercise_name: string
         tracking_type: TrackingType | null
         is_completed: boolean | null
         workout_sets:
           | Array<{
               is_completed: boolean
+              is_warmup: boolean | null
               actual_reps: number | null
               actual_weight: number | null
             }>
           | null
+        exercise: { body_part: string | null; target: string | null } | null
       }>
     | null
 }
@@ -171,6 +253,7 @@ export async function listSessionHistory(opts?: {
   limit?: number
 }): Promise<SessionHistoryItem[]> {
   const { userId } = await verifySession()
+  await closeStaleSessions()
 
   const supabase = await createClient()
   let query = supabase
@@ -192,7 +275,6 @@ export async function listSessionHistory(opts?: {
     const exercises = session.session_exercises ?? []
     let unitsDone = 0
     let unitsTotal = 0
-    let volume = 0
 
     for (const exercise of exercises) {
       const type = exercise.tracking_type ?? 'sets_reps_weight'
@@ -204,12 +286,6 @@ export async function listSessionHistory(opts?: {
       } else {
         unitsTotal += 1
         unitsDone += exercise.is_completed ? 1 : 0
-      }
-
-      for (const set of sets) {
-        if (set.is_completed && set.actual_weight && set.actual_reps) {
-          volume += set.actual_weight * set.actual_reps
-        }
       }
     }
 
@@ -233,8 +309,21 @@ export async function listSessionHistory(opts?: {
       exercise_count: exercises.length,
       units_done: unitsDone,
       units_total: unitsTotal,
-      volume_kg: Math.round(volume),
       duration_seconds: duration,
+      exercises: exercises.map((exercise) => ({
+        key: exercise.exercise_id ?? `name:${exercise.exercise_name}`,
+        name: exercise.exercise_name,
+        body_part: exercise.exercise?.body_part ?? null,
+        target: exercise.exercise?.target ?? null,
+        tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+        sets: (exercise.workout_sets ?? [])
+          .filter((set) => set.is_completed && !set.is_warmup)
+          .map((set) => ({
+            // numeric(6,2) puede llegar como string desde PostgREST.
+            weight: set.actual_weight === null ? null : Number(set.actual_weight),
+            reps: set.actual_reps,
+          })),
+      })),
     }
   })
 }

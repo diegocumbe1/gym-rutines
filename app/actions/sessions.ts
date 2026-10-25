@@ -561,7 +561,12 @@ export async function startWorkoutSession(formData: FormData) {
     .from('workout_sessions')
     .update({
       status: 'in_progress',
-      started_at: session.started_at ?? new Date().toISOString(),
+      // Al retomar una cancelada empieza de nuevo; si no, se volvería a cerrar
+      // sola por llevar más de 24 h iniciada.
+      started_at:
+        session.status === 'cancelled' || !session.started_at
+          ? new Date().toISOString()
+          : session.started_at,
     })
     .eq('id', id)
     .eq('user_id', userId)
