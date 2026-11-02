@@ -10,7 +10,10 @@
     "import:exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-exercises.ts",
     "import:free-exercises": "node --env-file=.env.local --experimental-strip-types scripts/import-free-exercise-db.ts",
     "upload:media": "node --env-file=.env.local --experimental-strip-types scripts/upload-media.ts",
-    "seed:templates": "node --env-file=.env.local --experimental-strip-types scripts/seed-workout-templates.ts"
+    "seed:templates": "node --env-file=.env.local --experimental-strip-types scripts/seed-workout-templates.ts",
+    "check:game": "node --experimental-strip-types --import ./scripts/register-ts-paths.mjs scripts/check-game.ts",
+    "migrate:status": "pnpm dlx supabase migration list --remote",
+    "migrate": "pnpm dlx supabase db push --remote"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

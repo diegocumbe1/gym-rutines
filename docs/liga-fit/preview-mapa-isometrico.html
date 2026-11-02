@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liga Fit — Isométrico vs tarjetas 2D</title>
+<style>
+  :root { --marca: #6D28D9; --marca-2: #8B5CF6; --lima: #A3E635; --texto: #0F172A; --gris: #64748B; --fondo: #0B1020; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: radial-gradient(1200px 700px at 50% 0%, #1E1B4B, var(--fondo)); color: #E2E8F0; min-height: 100vh; }
+  header { text-align: center; padding: 36px 20px 10px; }
+  header h1 { margin: 0; font-size: 34px; }
+  header p { margin: 8px 0 0; color: #94A3B8; }
+  .ficticia { display: inline-block; margin-top: 10px; font-size: 13px; color: #A5B4FC; border: 1px solid #4338CA; border-radius: 999px; padding: 4px 12px; }
+  .compare { display: flex; justify-content: center; gap: 70px; flex-wrap: wrap; padding: 30px 20px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .col h2 { margin: 0; font-size: 22px; }
+  .col .tag { font-size: 13px; color: #CBD5E1; }
+
+  /* Celular */
+  .phone { width: 380px; height: 780px; border-radius: 52px; background: #020617; padding: 14px; box-shadow: 0 40px 80px rgba(0,0,0,.5), inset 0 0 0 2px #334155; position: relative; }
+  .notch { position: absolute; left: 50%; top: 22px; width: 110px; height: 28px; margin-left: -55px; background: #020617; border-radius: 16px; z-index: 5; }
+  .screen { width: 100%; height: 100%; border-radius: 40px; overflow: hidden; background: #F8FAFC; color: var(--texto); display: flex; flex-direction: column; }
+  .top { background: linear-gradient(135deg, var(--marca), var(--marca-2)); color: #fff; padding: 52px 18px 16px; display: flex; gap: 12px; align-items: center; }
+  .top .who { flex: 1; }
+  .top b { display: block; font-size: 18px; }
+  .top span { font-size: 13px; opacity: .85; }
+  .lvl { background: rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px; font-weight: 800; font-size: 14px; }
+  .week { display: flex; gap: 6px; padding: 12px 16px 4px; }
+  .week div { flex: 1; text-align: center; font-size: 11px; color: var(--gris); }
+  .week i { display: block; height: 30px; border-radius: 10px; margin-bottom: 4px; background: #E2E8F0; font-style: normal; line-height: 30px; font-size: 15px; }
+  .week i.on { background: var(--lima); }
+  .goal { margin: 6px 16px 0; font-size: 13px; color: var(--gris); }
+  .goal b { color: var(--texto); }
+  .body { flex: 1; position: relative; overflow: hidden; }
+  .nav { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #E2E8F0; padding: 8px 0 20px; text-align: center; font-size: 11px; color: var(--gris); background: #fff; }
+  .nav span { display: block; font-size: 20px; }
+  .nav .on { color: var(--marca); font-weight: 800; }
+
+  /* Avatar SVG por capas */
+  .avatar { width: 54px; height: 54px; border-radius: 50%; background: #fff; display: grid; place-items: center; overflow: hidden; }
+
+  /* Tarjetas 2D */
+  .cards { padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .zone { background: #fff; border-radius: 18px; padding: 12px; box-shadow: 0 2px 10px rgba(15,23,42,.06); border: 2px solid transparent; }
+  .zone.on { border-color: var(--lima); }
+  .zone .ic { font-size: 30px; }
+  .zone b { display: block; font-size: 15px; margin-top: 4px; }
+  .zone small { color: var(--gris); font-size: 12px; }
+  .bar { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--marca-2), var(--lima)); }
+  .reto { margin: 0 16px; background: #F5F3FF; border: 2px dashed var(--marca-2); border-radius: 16px; padding: 10px 12px; font-size: 13px; }
+  .reto b { color: var(--marca); }
+
+  /* Isométrico */
+  .iso { position: absolute; inset: 0; }
+  .iso svg { width: 100%; height: 100%; }
+  .zlabel { font-size: 11px; font-weight: 800; fill: #0F172A; }
+  .pill { fill: #fff; stroke: #E2E8F0; }
+  .walker { transition: transform 1.4s ease-in-out; }
+  .bob { animation: bob .5s ease-in-out infinite alternate; }
+  @keyframes bob { to { transform: translateY(-4px); } }
+  .glow { animation: glow 1.4s ease-in-out infinite alternate; }
+  @keyframes glow { to { opacity: .35; } }
+  .hint { position: absolute; left: 12px; right: 12px; bottom: 10px; background: rgba(255,255,255,.92); border-radius: 14px; padding: 8px 12px; font-size: 12px; box-shadow: 0 4px 14px rgba(15,23,42,.12); }
+
+  /* Comparativa */
+  table { margin: 10px auto 50px; border-collapse: collapse; width: min(920px, 92vw); background: rgba(15,23,42,.6); border-radius: 16px; overflow: hidden; font-size: 15px; }
+  th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #1E293B; vertical-align: top; }
+  th { background: #1E1B4B; color: #C7D2FE; }
+  td:first-child { color: #94A3B8; width: 26%; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Liga Fit · ¿isométrico o tarjetas 2D?</h1>
+  <p>La misma pantalla, la de las zonas entrenadas esta semana, en las dos versiones</p>
+  <span class="ficticia">Gimnasio y marca ficticios para demostración</span>
+</header>
+
+<div class="compare">
+  <div class="col">
+    <h2>Tarjetas 2D</h2>
+    <span class="tag">Más rápida de construir · clara y funcional</span>
+    <div class="phone"><div class="notch"></div><div class="screen" id="s2d"></div></div>
+  </div>
+  <div class="col">
+    <h2>Mapa isométrico</h2>
+    <span class="tag">Más vistosa · el avatar recorre el gimnasio</span>
+    <div class="phone"><div class="notch"></div><div class="screen" id="siso"></div></div>
+  </div>
+</div>
+
+<table>
+  <tr><th></th><th>Tarjetas 2D</th><th>Mapa isométrico</th></tr>
+  <tr><td>Cómo se ve</td><td>Cuadrícula de zonas con barra de progreso semanal</td><td>Gimnasio en 3D falso; las zonas entrenadas se iluminan y el avatar camina hasta ellas</td></tr>
+  <tr><td>Impacto en una presentación</td><td>Correcto, se parece a otras apps de gimnasio</td><td>Alto: es lo que la gente recuerda (como el parque de la referencia)</td></tr>
+  <tr><td>Uso diario del socio</td><td>Muy rápido de leer</td><td>Más divertido, un poco más lento de leer: se acompaña con la lista de zonas</td></tr>
+  <tr><td>Arte necesario</td><td>Íconos</td><td>Escena del gimnasio y avatar en ángulo isométrico (lo dibujamos en SVG o se compra un paquete de arte)</td></tr>
+  <tr><td>Personalizar por gimnasio</td><td>Cambiar colores y nombres de zonas</td><td>Además, reacomodar las zonas en el plano según el local real</td></tr>
+  <tr><td>Esfuerzo</td><td>Base</td><td>≈ 50 horas más que la versión 2D</td></tr>
+</table>
+
+<script>
+/* ---------- Partes comunes ---------- */
+const avatar = (size = 54) => `<svg viewBox="0 0 54 54" width="${size}" height="${size}">
+  <circle cx="27" cy="27" r="27" fill="#EDE9FE"/>
+  <path d="M10 54c2-12 9-17 17-17s15 5 17 17z" fill="#6D28D9"/>
+  <path d="M19 40h16l-2 6H21z" fill="#A3E635"/>
+  <circle cx="27" cy="23" r="10" fill="#C68B59"/>
+  <path d="M16 21c0-8 6-12 11-12s11 3 11 11c-3-3-8-4-11-4s-8 1-11 5z" fill="#2B1B10"/>
+  <rect x="17" y="13" width="20" height="4" rx="2" fill="#A3E635"/>
+</svg>`;
+
+const topHtml = `<div class="top"><div class="avatar">${avatar()}</div>
+  <div class="who"><b>Vale · Fuerza</b><span>Meta: 3 días por semana</span></div><div class="lvl">⚡ Nivel 7</div></div>
+  <div class="week">${["L","M","X","J","V","S","D"].map((d, i) => `<div><i class="${[0, 2, 3].includes(i) ? "on" : ""}">${[0, 2, 3].includes(i) ? "✓" : ""}</i>${d}</div>`).join("")}</div>
+  <div class="goal">🔥 Racha de <b>5 semanas</b> · ¡Cumpliste tu meta de esta semana!</div>`;
+const nav = `<div class="nav"><div><span>🏠</span>Hoy</div><div class="on"><span>🗺️</span>Mi gym</div><div><span>🏆</span>Liga</div><div><span>🎁</span>Premios</div></div>`;
+
+const zones = [
+  { id: "pesas", name: "Pesas", ic: "🏋️", n: 2, color: "#8B5CF6" },
+  { id: "cardio", name: "Cardio", ic: "🏃", n: 1, color: "#F97316" },
+  { id: "funcional", name: "Funcional", ic: "🤸", n: 1, color: "#10B981" },
+  { id: "clases", name: "Clases", ic: "💃", n: 0, color: "#EC4899" },
+  { id: "estiramiento", name: "Estiramiento", ic: "🧘", n: 0, color: "#0EA5E9" },
+  { id: "piscina", name: "Piscina", ic: "🏊", n: 0, color: "#3B82F6" },
+];
+
+/* ---------- Versión 2D ---------- */
+document.getElementById("s2d").innerHTML = `${topHtml}
+  <div class="body">
+    <div class="cards">${zones.map(z => `<div class="zone ${z.n ? "on" : ""}">
+      <div class="ic">${z.ic}</div><b>${z.name}</b><small>${z.n ? `${z.n} ${z.n === 1 ? "vez" : "veces"} esta semana` : "Sin entrenar aún"}</small>
+      <div class="bar"><i style="width:${Math.min(100, z.n * 34)}%"></i></div></div>`).join("")}</div>
+    <div class="reto">🎯 <b>Reto semana balanceada:</b> entrena 4 zonas distintas · 3/4 · +150 XP</div>
+  </div>${nav}`;
+
+/* ---------- Versión isométrica (SVG) ---------- */
+const TW = 40, TH = 20, OX = 150, OY = 92;
+const iso = (x, y, z = 0) => [(x - y) * TW / 2 + OX, (x + y) * TH / 2 - z + OY];
+const pts = a => a.map(p => p.join(",")).join(" ");
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(Math.min(255, v * k)));
+  return `rgb(${c.join(",")})`;
+}
+// Caja isométrica: cara superior, izquierda y derecha.
+function box(x, y, w, d, h, color, extra = "") {
+  const t = [iso(x, y, h), iso(x + w, y, h), iso(x + w, y + d, h), iso(x, y + d, h)];
+  const l = [iso(x, y + d, 0), iso(x + w, y + d, 0), iso(x + w, y + d, h), iso(x, y + d, h)];
+  const r = [iso(x + w, y, 0), iso(x + w, y + d, 0), iso(x + w, y + d, h), iso(x + w, y, h)];
+  return `<g ${extra}><polygon points="${pts(l)}" fill="${shade(color, .78)}"/><polygon points="${pts(r)}" fill="${shade(color, .62)}"/><polygon points="${pts(t)}" fill="${color}"/></g>`;
+}
+
+const layout = { pesas: [0.3, 0.3], cardio: [3.5, 0.3], funcional: [6.7, 0.3], clases: [0.3, 3.5], estiramiento: [3.5, 3.5], piscina: [6.7, 3.5] };
+let svg = "";
+// Piso del gimnasio con baldosas.
+for (let x = 0; x < 9.6; x += 1) for (let y = 0; y < 6.4; y += 1) svg += box(x, y, 1, 1, 0.01, (x + y) % 2 ? "#E2E8F0" : "#F1F5F9");
+svg += box(0, -0.4, 9.6, 0.4, 60, "#CBD5E1") + box(-0.4, -0.4, 0.4, 6.8, 60, "#E2E8F0");
+// Zonas en orden de atrás hacia adelante.
+const centers = {};
+for (const z of zones) {
+  const [x, y] = layout[z.id], on = z.n > 0;
+  const color = on ? z.color : "#CBD5E1";
+  if (on) svg += `<polygon class="glow" points="${pts([iso(x - .15, y - .15, 1), iso(x + 2.75, y - .15, 1), iso(x + 2.75, y + 2.75, 1), iso(x - .15, y + 2.75, 1)])}" fill="${z.color}" opacity=".7"/>`;
+  svg += box(x, y, 2.6, 2.6, 8, color);
+  const [cx, cy] = iso(x + 1.3, y + 1.3, 8);
+  centers[z.id] = [cx, cy];
+  svg += `<text x="${cx}" y="${cy + 4}" font-size="${on ? 34 : 28}" text-anchor="middle" opacity="${on ? 1 : .45}">${z.ic}</text>`;
+  const label = `${z.name}${on ? ` ✓${z.n}` : ""}`, w = label.length * 6.4 + 14;
+  svg += `<rect class="pill" x="${cx - w / 2}" y="${cy + 12}" width="${w}" height="18" rx="9"/><text class="zlabel" x="${cx}" y="${cy + 25}" text-anchor="middle">${label}</text>`;
+}
+// Avatar que camina entre las zonas entrenadas.
+svg += `<g class="walker" id="walker"><g class="bob"><ellipse cx="0" cy="2" rx="14" ry="5" fill="rgba(15,23,42,.18)"/><g transform="translate(-17,-44)">${avatar(34)}</g></g></g>`;
+
+document.getElementById("siso").innerHTML = `${topHtml}
+  <div class="body"><div class="iso"><svg viewBox="0 10 352 280" preserveAspectRatio="xMidYMin meet" style="margin-top:14px">${svg}</svg></div>
+    <div class="hint">👆 Toca una zona para ver tus rutinas · 🎯 Semana balanceada 3/4</div></div>${nav}`;
+
+const stops = ["pesas", "cardio", "funcional"].map(id => centers[id]);
+let i = 0;
+const walker = document.getElementById("walker");
+function walk() { const [x, y] = stops[i++ % stops.length]; walker.style.transform = `translate(${x - 26}px, ${y - 6}px)`; }
+walk(); setInterval(walk, 2200);
+</script>
+</body>
+</html>

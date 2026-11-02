@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Liga Fit — Avatar que evoluciona con tu progreso</title>
+<style>
+  :root { --marca: #6D28D9; --marca-2: #8B5CF6; --lima: #A3E635; --texto: #0F172A; --gris: #64748B; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background: radial-gradient(1200px 700px at 50% 0%, #1E1B4B, #0B1020); color: #E2E8F0; min-height: 100vh; }
+  header { text-align: center; padding: 30px 20px 6px; }
+  header h1 { margin: 0; font-size: 30px; }
+  header p { margin: 6px 0 0; color: #94A3B8; }
+  .ficticia { display: inline-block; margin-top: 10px; font-size: 13px; color: #A5B4FC; border: 1px solid #4338CA; border-radius: 999px; padding: 4px 12px; }
+  .wrap { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; padding: 24px 20px 50px; align-items: flex-start; }
+
+  .panel { width: 360px; background: #fff; color: var(--texto); border-radius: 26px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .panel h2 { margin: 0; font-size: 18px; }
+  .step { font-size: 12px; font-weight: 800; color: var(--marca); letter-spacing: .06em; text-transform: uppercase; }
+  label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--gris); }
+  label b { color: var(--texto); }
+  input[type=range] { width: 100%; accent-color: var(--marca); }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .seg button { border: 2px solid #E2E8F0; background: #fff; border-radius: 12px; padding: 8px 4px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .seg button.on { border-color: var(--marca); background: #F5F3FF; color: var(--marca); }
+  .photo { display: flex; gap: 12px; align-items: center; }
+  .photo canvas { width: 72px; height: 72px; border-radius: 16px; background: #F1F5F9; object-fit: cover; }
+  .file { display: inline-block; background: var(--marca); color: #fff; font-weight: 800; border-radius: 999px; padding: 10px 16px; cursor: pointer; font-size: 14px; }
+  .file input { display: none; }
+  .swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatches span { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 3px solid #fff; box-shadow: 0 0 0 1px #CBD5E1; }
+  .swatches span.on { box-shadow: 0 0 0 3px var(--marca); }
+  .privacy { font-size: 12px; background: #F0FDF4; color: #166534; border-radius: 12px; padding: 8px 10px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* Celular */
+  .phone { width: 380px; height: 780px; border-radius: 52px; background: #020617; padding: 14px; box-shadow: 0 40px 80px rgba(0,0,0,.5), inset 0 0 0 2px #334155; position: relative; }
+  .notch { position: absolute; left: 50%; top: 22px; width: 110px; height: 28px; margin-left: -55px; background: #020617; border-radius: 16px; z-index: 5; }
+  .screen { width: 100%; height: 100%; border-radius: 40px; overflow: hidden; background: #F8FAFC; color: var(--texto); display: flex; flex-direction: column; }
+  .top { background: linear-gradient(135deg, var(--marca), var(--marca-2)); color: #fff; padding: 52px 18px 14px; }
+  .top b { font-size: 20px; }
+  .top div { font-size: 13px; opacity: .85; }
+  .evo { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 14px 14px 0; }
+  .evo > div { background: #fff; border-radius: 20px; padding: 10px 6px 8px; text-align: center; box-shadow: 0 2px 10px rgba(15,23,42,.06); }
+  .evo h3 { margin: 0; font-size: 13px; color: var(--gris); }
+  .evo .now { outline: 3px solid var(--lima); }
+  .evo svg { width: 100%; height: 300px; }
+  .stats { margin: 12px 14px 0; background: #fff; border-radius: 18px; padding: 12px 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; text-align: center; box-shadow: 0 2px 10px rgba(15,23,42,.06); }
+  .stats b { display: block; font-size: 18px; }
+  .stats span { font-size: 11px; color: var(--gris); }
+  .msg { margin: 12px 14px 0; background: #F5F3FF; border-radius: 16px; padding: 10px 12px; font-size: 13px; }
+  .msg b { color: var(--marca); }
+  .nav { margin-top: auto; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #E2E8F0; padding: 8px 0 20px; text-align: center; font-size: 11px; color: var(--gris); background: #fff; }
+  .nav span { display: block; font-size: 20px; }
+  .nav .on { color: var(--marca); font-weight: 800; }
+  .note { max-width: 780px; margin: 0 auto 50px; color: #94A3B8; font-size: 14px; line-height: 1.6; padding: 0 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Avatar que evoluciona con tu progreso</h1>
+  <p>Foto → colores del avatar · género, talla y peso → cuerpo · entrenamiento → evolución hacia tu objetivo</p>
+  <span class="ficticia">Gimnasio ficticio · datos de ejemplo</span>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="step">1 · Tu foto (opcional)</div>
+    <div class="photo">
+      <canvas id="photo" width="144" height="144"></canvas>
+      <label class="file">📷 Subir foto<input id="file" type="file" accept="image/*" capture="user"></label>
+    </div>
+    <div class="privacy">🔒 La foto se analiza solo en tu celular para sugerir tono de piel y pelo. No se sube ni se guarda.</div>
+    <label><b>Tono de piel</b><div class="swatches" id="skin"></div></label>
+    <label><b>Color de pelo</b><div class="swatches" id="hair"></div></label>
+
+    <div class="step">2 · Tus datos</div>
+    <label><b>Cuerpo del avatar</b>
+      <div class="seg" id="gender"><button data-v="h">Masculino</button><button data-v="m" class="on">Femenino</button><button data-v="n">Neutro</button></div>
+    </label>
+    <label><b>Objetivo</b>
+      <div class="seg" id="goal"><button data-v="fuerza">Fuerza</button><button data-v="grasa" class="on">Bajar grasa</button><button data-v="salud">Bienestar</button></div>
+    </label>
+    <label>Talla: <b id="vh"></b><input id="h" type="range" min="145" max="200" value="163"></label>
+    <div class="pair">
+      <label>Peso al inicio: <b id="vw0"></b><input id="w0" type="range" min="45" max="130" value="88"></label>
+      <label>Peso hoy: <b id="vw1"></b><input id="w1" type="range" min="45" max="130" value="70"></label>
+    </div>
+
+    <div class="step">3 · Tu constancia</div>
+    <label>Semanas entrenando: <b id="vs"></b><input id="s" type="range" min="0" max="52" value="24"></label>
+  </div>
+
+  <div class="phone"><div class="notch"></div><div class="screen">
+    <div class="top"><b>Mi evolución</b><div id="sub"></div></div>
+    <div class="evo">
+      <div><h3>Al empezar</h3><svg id="a0" viewBox="22 18 156 268"></svg></div>
+      <div class="now"><h3>Hoy</h3><svg id="a1" viewBox="22 18 156 268"></svg></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="msg" id="msg"></div>
+    <div class="nav"><div><span>🏠</span>Hoy</div><div><span>🗺️</span>Mi gym</div><div class="on"><span>🧍</span>Yo</div><div><span>🎁</span>Premios</div></div>
+  </div></div>
+</div>
+
+<p class="note">
+  <b>Cómo funciona:</b> el cuerpo del avatar se calcula con la talla y el peso. El entrenamiento le suma definición (hombros, brazos, piernas) según el objetivo: con <i>fuerza</i> gana volumen muscular aunque el peso suba; con <i>bajar grasa</i> se estiliza la cintura; con <i>bienestar</i> cambian sobre todo la postura y la energía. El peso es privado: nunca aparece en la liga ni en rankings. En producción, las medidas las registra el entrenador en la valoración física mensual.
+</p>
+
+<script>
+const $ = s => document.querySelector(s);
+const SKINS = ["#F5D0B5", "#E8B48F", "#C68B59", "#9C6B43", "#6B4226", "#4A2C1A"];
+const HAIRS = ["#1F1410", "#4A2C1A", "#8B5A2B", "#D4A55C", "#B03A2E", "#9CA3AF"];
+const state = { skin: SKINS[2], hair: HAIRS[0], gender: "m", goal: "grasa" };
+
+function swatches(el, list, key) {
+  el.innerHTML = list.map(c => `<span style="background:${c}" data-c="${c}" class="${c === state[key] ? "on" : ""}"></span>`).join("");
+  el.onclick = e => { if (e.target.dataset.c) { state[key] = e.target.dataset.c; render(); } };
+}
+function segmented(el, key) {
+  el.onclick = e => { const v = e.target.dataset.v; if (!v) return; state[key] = v; [...el.children].forEach(b => b.classList.toggle("on", b.dataset.v === v)); render(); };
+}
+segmented($("#gender"), "gender");
+segmented($("#goal"), "goal");
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+function shade(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${[n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(clamp(v * k, 0, 255))).join(",")})`;
+}
+
+/**
+ * Avatar paramétrico de frente. fat: 0..1 a partir del IMC; muscle: 0..1 a partir de la constancia
+ * y el objetivo; tall: 0..1 a partir de la talla.
+ */
+function avatarSVG({ fat, muscle, tall, gender }) {
+  const g = { h: [1, 0], m: [0, 1], n: [.5, .5] }[gender];
+  const sh = lerp(30, 36, g[0]) + muscle * 9 + fat * 6;          // medio ancho de hombros
+  const waist = lerp(20, 16, g[1]) + fat * 30 - muscle * 3;         // medio ancho de cintura
+  const hip = lerp(22, 27, g[1]) + fat * 16;                        // medio ancho de cadera
+  const arm = 6 + fat * 7 + muscle * 5;                             // grosor de brazo
+  const leg = 9 + fat * 8 + muscle * 4;
+  const belly = fat * 22;
+  const H = lerp(0.9, 1.08, tall);                                  // escala vertical por talla
+  const cx = 100, neckY = 70, shY = 82, waistY = 82 + 62 * H, hipY = waistY + 22 * H, footY = hipY + 100 * H;
+  const skin = state.skin, skinD = shade(skin, .85), shirt = "#6D28D9", shorts = "#1E293B";
+  const def = muscle > .45 ? `<path d="M${cx - 12} ${shY + 20} q12 8 24 0" stroke="${shade(shirt, .75)}" stroke-width="2.5" fill="none"/><path d="M${cx} ${shY + 12} v${30 * H}" stroke="${shade(shirt, .8)}" stroke-width="2" />` : "";
+  const hairLong = g[1] > .6;
+  return `
+    <ellipse cx="${cx}" cy="${footY + 6}" rx="${hip + 18}" ry="6" fill="rgba(15,23,42,.12)"/>
+    <!-- piernas -->
+    <rect x="${cx - hip + 4}" y="${hipY - 4}" width="${leg * 2}" height="${footY - hipY}" rx="${leg}" fill="${skin}"/>
+    <rect x="${cx + hip - 4 - leg * 2}" y="${hipY - 4}" width="${leg * 2}" height="${footY - hipY}" rx="${leg}" fill="${skin}"/>
+    <rect x="${cx - hip + 2}" y="${footY - 8}" width="${leg * 2 + 6}" height="10" rx="5" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <rect x="${cx + hip - 8 - leg * 2}" y="${footY - 8}" width="${leg * 2 + 6}" height="10" rx="5" fill="#F8FAFC" stroke="#CBD5E1"/>
+    <!-- short -->
+    <path d="M${cx - waist - 2} ${waistY} L${cx + waist + 2} ${waistY} L${cx + hip + 2} ${hipY + 26 * H} L${cx + 4} ${hipY + 26 * H} L${cx} ${hipY + 4} L${cx - 4} ${hipY + 26 * H} L${cx - hip - 2} ${hipY + 26 * H} Z" fill="${shorts}"/>
+    <!-- brazos -->
+    <path d="M${cx - sh + 2} ${shY + 4} q${-arm - 6} ${40 * H} ${-arm - 2} ${76 * H}" stroke="${skin}" stroke-width="${arm * 2}" stroke-linecap="round" fill="none"/>
+    <path d="M${cx + sh - 2} ${shY + 4} q${arm + 6} ${40 * H} ${arm + 2} ${76 * H}" stroke="${skin}" stroke-width="${arm * 2}" stroke-linecap="round" fill="none"/>
+    <!-- torso / camiseta -->
+    <path d="M${cx - sh} ${shY} Q${cx} ${shY - 8} ${cx + sh} ${shY}
+             Q${cx + sh + 2} ${shY + 24} ${cx + waist + belly * .6} ${waistY - 20 * H}
+             Q${cx + waist + belly} ${waistY - 6} ${cx + waist + 2} ${waistY + 2}
+             L${cx - waist - 2} ${waistY + 2}
+             Q${cx - waist - belly} ${waistY - 6} ${cx - waist - belly * .6} ${waistY - 20 * H}
+             Q${cx - sh - 2} ${shY + 24} ${cx - sh} ${shY} Z" fill="${shirt}"/>
+    <path d="M${cx - waist + 4} ${waistY - 4} h${(waist - 4) * 2}" stroke="#A3E635" stroke-width="4"/>
+    ${def}
+    <!-- cuello y cabeza -->
+    <rect x="${cx - 7}" y="${neckY - 6}" width="14" height="${shY - neckY + 8}" rx="6" fill="${skinD}"/>
+    ${hairLong ? `<path d="M${cx - 24} ${neckY - 26} q-4 34 6 44 h36 q10 -10 6 -44 z" fill="${state.hair}"/>` : ""}
+    <ellipse cx="${cx}" cy="${neckY - 22}" rx="${19 + fat * 7}" ry="23" fill="${skin}"/>
+    <path d="M${cx - 21} ${neckY - 26} q2 -24 21 -24 q20 0 21 22 q-10 -10 -22 -10 q-12 0 -20 12z" fill="${state.hair}"/>
+    <circle cx="${cx - 7}" cy="${neckY - 22}" r="2.4" fill="#0F172A"/><circle cx="${cx + 7}" cy="${neckY - 22}" r="2.4" fill="#0F172A"/>
+    <path d="M${cx - 7} ${neckY - 12} q7 ${4 + muscle * 3} 14 0" stroke="#0F172A" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <rect x="${cx - 21}" y="${neckY - 42}" width="42" height="6" rx="3" fill="#A3E635"/>`;
+}
+
+function bodyParams(weight, weeks, height) {
+  const bmi = weight / Math.pow(height / 100, 2);
+  // El IMC solo orienta la silueta; con objetivo fuerza el peso que sube se interpreta como músculo.
+  const consistency = clamp(weeks / 40);
+  const muscleGain = { fuerza: 1, grasa: .55, salud: .4 }[state.goal];
+  const muscle = consistency * muscleGain;
+  let fat = clamp((bmi - 19) / 15);
+  if (state.goal === "fuerza") fat = clamp(fat - muscle * .25);
+  return { fat, muscle, tall: clamp((height - 145) / 55), gender: state.gender, bmi };
+}
+
+function render() {
+  const h = +$("#h").value, w0 = +$("#w0").value, w1 = +$("#w1").value, s = +$("#s").value;
+  $("#vh").textContent = `${h} cm`; $("#vw0").textContent = `${w0} kg`; $("#vw1").textContent = `${w1} kg`;
+  $("#vs").textContent = `${s} ${s === 1 ? "semana" : "semanas"}`;
+  swatches($("#skin"), SKINS, "skin"); swatches($("#hair"), HAIRS, "hair");
+  const p0 = bodyParams(w0, 0, h), p1 = bodyParams(w1, s, h);
+  $("#a0").innerHTML = avatarSVG(p0);
+  $("#a1").innerHTML = avatarSVG(p1);
+  const goalTxt = { fuerza: "Fuerza", grasa: "Bajar grasa", salud: "Bienestar" }[state.goal];
+  $("#sub").textContent = `Objetivo: ${goalTxt} · ${s} semanas entrenando`;
+  const dw = w1 - w0;
+  $("#stats").innerHTML = `<div><b>${s}</b><span>Semanas</span></div><div><b>${Math.round(s * 2.8)}</b><span>Entrenos</span></div><div><b>${dw > 0 ? "+" : ""}${dw} kg</b><span>Privado 🔒</span></div>`;
+  const msg = state.goal === "fuerza"
+    ? (dw >= 0 ? "Ganaste masa y tu avatar está más fuerte. ¡Sigue así!" : "Vas ganando fuerza. Revisa tu alimentación con tu entrenador para sumar músculo.")
+    : state.goal === "grasa"
+      ? (dw < 0 ? "Tu avatar refleja tu cambio. ¡Gran constancia!" : "Tu constancia ya suma. En la próxima valoración vemos tu avance.")
+      : "Tu avatar gana energía con cada semana que entrenas.";
+  $("#msg").innerHTML = `<b>Próxima valoración física:</b> en 2 semanas con tu entrenador.<br>${msg}`;
+}
+["#h", "#w0", "#w1", "#s"].forEach(id => $(id).addEventListener("input", render));
+
+// Foto: se dibuja en un canvas local y se toman colores aproximados de cara y pelo (sin subirla a ningún lado).
+$("#file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = $("#photo"), ctx = c.getContext("2d", { willReadFrequently: true });
+    const side = Math.min(img.width, img.height);
+    ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, c.width, c.height);
+    const avg = (x, y, w, h) => {
+      const d = ctx.getImageData(x, y, w, h).data; let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      return [r / n, g / n, b / n];
+    };
+    const near = (rgb, list) => list.reduce((best, hex) => {
+      const n = parseInt(hex.slice(1), 16), c2 = [n >> 16, (n >> 8) & 255, n & 255];
+      const d = c2.reduce((s, v, i) => s + (v - rgb[i]) ** 2, 0);
+      return d < best.d ? { hex, d } : best;
+    }, { hex: list[0], d: Infinity }).hex;
+    // Supone una selfie centrada: mejillas al centro, pelo arriba.
+    state.skin = near(avg(52, 64, 40, 24), SKINS);
+    state.hair = near(avg(52, 6, 40, 14), HAIRS);
+    URL.revokeObjectURL(img.src);
+    render();
+  };
+  img.src = URL.createObjectURL(f);
+});
+
+render();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import type { SessionHistoryItem } from '@/lib/data/sessions'
+import type { HistoryExercise, SessionHistoryItem } from '@/lib/data/sessions'
 import { startOfWeek } from '@/lib/dates'
 import { bodyPartLabel } from '@/lib/exercises/labels'
 import { musclesFor, type MapMuscle } from '@/lib/workouts/muscle-map'
@@ -40,6 +40,26 @@ export type WeeklyFrequencyRow = {
   avg: number
 }
 
+/**
+ * Zonas (`body_part`) que trabajó una sesión, cada una una sola vez.
+ * Por defecto solo cuentan los ejercicios con series hechas; `includeTimed`
+ * suma también los de tiempo o de una vez marcados como hechos (p. ej. cardio).
+ */
+export function trainedBodyParts(
+  exercises: Array<Pick<HistoryExercise, 'body_part' | 'tracking_type' | 'is_completed' | 'sets'>>,
+  opts?: { includeTimed?: boolean }
+) {
+  return new Set(
+    exercises
+      .filter((exercise) =>
+        tracksSets(exercise.tracking_type)
+          ? exercise.sets.length > 0
+          : Boolean(opts?.includeTimed) && exercise.is_completed
+      )
+      .map((exercise) => exercise.body_part ?? OTHER_BODY_PART)
+  )
+}
+
 /** Cuántas sesiones por semana trabajaron cada zona (y cuántas hubo en total). */
 export function weeklyFrequency(sessions: SessionHistoryItem[], weekStarts: string[]) {
   const weekIndex = new Map(weekStarts.map((week, index) => [week, index]))
@@ -52,12 +72,7 @@ export function weeklyFrequency(sessions: SessionHistoryItem[], weekStarts: stri
     totals[index] += 1
 
     // Una sesión cuenta una sola vez por zona, aunque tenga varios ejercicios.
-    const trained = new Set(
-      session.exercises
-        .filter((exercise) => tracksSets(exercise.tracking_type) && exercise.sets.length > 0)
-        .map((exercise) => exercise.body_part ?? OTHER_BODY_PART)
-    )
-    for (const zone of trained) {
+    for (const zone of trainedBodyParts(session.exercises)) {
       const counts = zones.get(zone) ?? weekStarts.map(() => 0)
       counts[index] += 1
       zones.set(zone, counts)

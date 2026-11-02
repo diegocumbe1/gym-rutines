@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, ClipboardList, Dumbbell, History, type LucideIcon } from 'lucide-react'
+import { Home, ClipboardList, Dumbbell, History, Trophy, type LucideIcon } from 'lucide-react'
 
 type NavItem = { href: string; label: string; icon: LucideIcon }
 
@@ -11,6 +11,7 @@ const items: NavItem[] = [
   { href: '/templates', label: 'Plantillas', icon: ClipboardList },
   { href: '/exercises', label: 'Ejercicios', icon: Dumbbell },
   { href: '/history', label: 'Historial', icon: History },
+  { href: '/liga', label: 'Liga', icon: Trophy },
 ]
 
 export function BottomNav() {

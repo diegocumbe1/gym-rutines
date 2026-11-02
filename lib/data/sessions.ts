@@ -185,6 +185,7 @@ export type SessionHistoryItem = {
   title: string
   scheduled_date: string
   status: string
+  completed_at: string | null
   exercise_count: number
   /** Unidades hechas / totales: series en los ejercicios que las usan, y el
    *  propio ejercicio en los de tiempo o de una sola vez. */
@@ -204,6 +205,8 @@ export type HistoryExercise = {
   /** Músculo principal según el catálogo. */
   target: string | null
   tracking_type: TrackingType
+  /** Marcado como hecho; es lo que cuenta en los ejercicios de tiempo o de una vez. */
+  is_completed: boolean
   /** Series completadas que no son de calentamiento. */
   sets: Array<{ weight: number | null; reps: number | null }>
 }
@@ -251,6 +254,8 @@ export async function listSessionHistory(opts?: {
   /** Primer día ya excluido, para acotar la semana o el mes. */
   toExclusive?: string
   limit?: number
+  /** Solo terminadas: Liga Fit calcula puntos y racha con todo ese historial. */
+  completedOnly?: boolean
 }): Promise<SessionHistoryItem[]> {
   const { userId } = await verifySession()
   await closeStaleSessions()
@@ -260,7 +265,7 @@ export async function listSessionHistory(opts?: {
     .from('workout_sessions')
     .select(HISTORY_SELECT)
     .eq('user_id', userId)
-    .in('status', ['in_progress', 'completed'])
+    .in('status', opts?.completedOnly ? ['completed'] : ['in_progress', 'completed'])
     .order('scheduled_date', { ascending: false })
     .limit(opts?.limit ?? 60)
 
@@ -306,6 +311,7 @@ export async function listSessionHistory(opts?: {
       title: session.title,
       scheduled_date: session.scheduled_date,
       status: session.status,
+      completed_at: session.completed_at,
       exercise_count: exercises.length,
       units_done: unitsDone,
       units_total: unitsTotal,
@@ -316,6 +322,7 @@ export async function listSessionHistory(opts?: {
         body_part: exercise.exercise?.body_part ?? null,
         target: exercise.exercise?.target ?? null,
         tracking_type: exercise.tracking_type ?? 'sets_reps_weight',
+        is_completed: exercise.is_completed ?? false,
         sets: (exercise.workout_sets ?? [])
           .filter((set) => set.is_completed && !set.is_warmup)
           .map((set) => ({
